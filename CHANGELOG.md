@@ -1,0 +1,61 @@
+# Changelog
+
+All notable changes to this project are documented here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
+[Semantic Versioning](https://semver.org/) (pre-1.0: minor versions may include breaking changes).
+
+## [Unreleased]
+
+## [0.3.0]: code suites
+
+Write suites in code: score with your own functions and call your agent in-process.
+
+### Added
+- **Code suites:** `regrade run` accepts `.ts`, `.mts`, `.js` and `.mjs` files whose default export is a suite (or an async function returning one). Everything a JSON suite has, plus `scorers` (name → function returning a boolean or `{ pass, value, reasoning }`, or an object with `requiresExpected` / `preflight` / `fingerprint`) and a **function pipeline** (`pipeline: { name?, run, config? }`) that tests your agent in your own process with no HTTP server. `defineSuite()` and the `CodeSuite` type give editor completion.
+- TypeScript is imported natively by Node's type stripping (**Node 22.18+**): no loader, no build step, no new dependency. Older Node versions get a clear error pointing at `.mjs` or JSON.
+- `regrade init --ts` scaffolds a runnable code suite that needs no server and no API key.
+- Inline scorers are fingerprinted from their source and the fingerprint is part of a case's identity, so editing a scorer makes `regrade compare` report the case as `modified` rather than as a regression. Case hashes of suites that use only built-in scorers are unchanged.
+- Library: `loadSuiteFile`, `defineSuite`, `functionAdapter`, `toScorer`; `Scorer.fingerprint` (additive).
+- SECURITY.md documents that code suites are programs, not data.
+
+### Fixed
+- **Timeouts and interrupts now bind for every adapter and scorer,** even user code that ignores its `AbortSignal` (a hung function or scorer becomes an errored attempt). Previously only cooperating code (HTTP calls, the judge) was cancelled.
+- **A run can no longer exit silently with code 0 mid-run** when the only pending work is a promise that never settles (Node does not keep the event loop alive for `AbortSignal.timeout()` timers or pending promises); the runner now holds the loop open until it finishes.
+- After a command finishes, a process kept alive by user code (a leaked interval or socket) is exited after a 2-second grace period, preserving the exit code.
+
+## [0.2.0]: compare and report
+
+Turns saved runs into a regression workflow: see what got worse, whether it is real, and share it.
+
+### Added
+- `regrade compare [base] [head]`: per-case pass rates with Wilson intervals, Fisher exact tests, and a case-stratified paired permutation test (with a within-case bootstrap interval) for the overall change. Cases that were modified, new, removed or errored are listed but never counted as regressions. `--fail-on-regression` / `--significant-only` gate CI (exit 1); `--json`, `--md`, `--all`, `--suite`.- `regrade runs` (list runs) and `regrade show <run> [case]` (run summary, or a case's input, outputs, scores and errors).
+- `regrade report <run> [--against <base>]`: a single self-contained HTML report (no network, light/dark, filters, drill-down, comparison view). Untrusted pipeline output is only ever rendered as text.
+- Markdown reports for job summaries and PR comments: `regrade run --md`, `regrade compare --md`.
+- `--min-pass-rate <0-1>` on `run`: gate on the attempt-level pass rate instead of requiring every case to pass.
+- OpenAI prices (`gpt-6-astra`, `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, short-context tier) and support for GPT-5.6 `cache_write_tokens`; price entries can carry `validUntil` so promotional prices expire (GPT-5.6 Sol's promotion ends 2026-11-21).
+- JSON report cases now include the input snapshot, expected value and tags.
+- `npm run sample-report` generates a deterministic sample comparison report (`site/`), and a workflow publishes it to GitHub Pages.
+- Library exports: `compareRuns`, `regressionGate`, `renderHtmlReport`, `renderRunMarkdown`, `renderCompareMarkdown`, `renderComparison`, `wilsonInterval`, `fisherExact`, `stratifiedPermutationTest`, `stratifiedBootstrapInterval`.
+
+### Fixed
+- `runs` and `show` emitted ANSI colour codes when piped (commander defaults a negatable `--no-color` option to `true`).
+
+### Known limitations
+- OpenAI long-context pricing tiers are not modelled (short-context prices only).
+- The HTML report's client script is checked for syntax and visually reviewed, but has no automated DOM tests.
+
+## [0.1.0]: engine core
+
+First release: run a suite against a pipeline, score the outputs, and save the run.
+
+### Added
+- `regrade run`: executes a JSON suite with bounded concurrency, per-attempt timeouts, retries (network/429/5xx), `--repeat`, `--tag`/`--case` filters, `--label`, incremental persistence, and Ctrl+C-safe partial results. Exit codes `0` / `1` / `2` / `130`.
+- Adapters: `http` (any endpoint; optional self-reported cost/usage/steps), `openai` (Chat Completions-compatible, `baseUrl` override), `anthropic` (Messages API).
+- Scorers: `exactMatch`, `llmJudge` (nonce-fenced untrusted input, native structured output, fail-closed, judge cost tracked), `latencyCost` (enforces `maxLatencyMs` / `maxCostUsd`).
+- Cost engine pricing regular input, cache reads/writes and output separately; unknown models report unknown cost. User-supplied prices via suite `pricing` or `--prices`.
+- SQLite store (`runs`, `results` per attempt, `scores`), WAL, foreign keys, versioned migrations, redacted stored config.
+- Errored vs. failed attempt status; case verdicts `passed` / `failed` / `flaky` / `errored`.
+- Console reporter (append-only, CI-safe) and a versioned JSON report (`--json`).
+- `regrade init` (example suite + mock pipeline) and `regrade schema` (suite JSON Schema for editor autocomplete).
+- Library API: `createRegistry`, `registerScorer`, `registerAdapter`, `loadSuite`, `runSuite`, `SqliteStore`.
+- Test suite with a fault-injecting mock pipeline and stub LLM server; CI on Node 22/24 across Linux, macOS and Windows.

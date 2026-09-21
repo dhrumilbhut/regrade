@@ -1,0 +1,33 @@
+name: Release
+
+# Publishes to npm with a provenance attestation using npm trusted publishing
+# (GitHub OIDC): no npm token is stored anywhere.
+#
+# One-time setup on npmjs.com: package settings -> Trusted Publisher -> GitHub Actions,
+# with this repository and workflow file (release.yml). Then push a tag like v0.1.0.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  id-token: write # required for trusted publishing / provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - name: Tag matches package.json version
+        run: test "v$(node -p "require('./package.json').version")" = "${GITHUB_REF_NAME}"
+      - run: npm publish --access public

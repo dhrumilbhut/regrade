@@ -1,0 +1,78 @@
+{
+  "name": "regrade",
+  "version": "0.3.0",
+  "description": "Regression tests for AI agents and RAG pipelines. Git diff for AI behavior.",
+  "keywords": [
+    "llm",
+    "eval",
+    "evaluation",
+    "regression-testing",
+    "ai-agents",
+    "rag",
+    "llm-as-judge",
+    "testing",
+    "cli"
+  ],
+  "license": "MIT",
+  "author": "Dhrumil Bhut",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dhrumilbhut/regrade.git"
+  },
+  "homepage": "https://github.com/dhrumilbhut/regrade#readme",
+  "bugs": {
+    "url": "https://github.com/dhrumilbhut/regrade/issues"
+  },
+  "type": "module",
+  "bin": {
+    "regrade": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./schema/suite.schema.json": "./schema/suite.schema.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "schema",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=22.14"
+  },
+  "scripts": {
+    "build": "npm run clean && tsup && node dist/cli.js schema --out schema/suite.schema.json",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "npm run lint && npm run typecheck && npm run test",
+    "prepublishOnly": "npm run check && npm run build",
+    "clean": "node -e \"require(\\\"node:fs\\\").rmSync(\\\"dist\\\",{recursive:true,force:true})\"",
+    "sample-report": "npm run build && node scripts/sample-report.mjs"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "commander": "^15.0.0",
+    "picocolors": "^1.1.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.0",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^24.0.0",
+    "eslint": "^10.11.0",
+    "tsup": "^8.5.1",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.70.0",
+    "vitest": "^5.0.1"
+  }
+}

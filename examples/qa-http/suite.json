@@ -1,0 +1,24 @@
+{
+  "$schema": "https://unpkg.com/regrade/schema/suite.schema.json",
+  "name": "sample-qa-suite",
+  "description": "Smoke test suite for Regrade itself. Needs ANTHROPIC_API_KEY for the llmJudge scorer.",
+  "defaults": { "judge": "anthropic:claude-sonnet-5" },
+  "pipeline": {
+    "adapter": "http",
+    "config": { "url": "${PIPELINE_URL:-http://localhost:4000/pipeline}" }
+  },
+  "cases": [
+    {
+      "id": "capital-of-france",
+      "input": "What is the capital of France?",
+      "expected": "Paris",
+      "scorers": ["exactMatch", "llmJudge"]
+    },
+    {
+      "id": "latency-check",
+      "input": "Summarize: the quick brown fox jumps over the lazy dog.",
+      "scorers": ["llmJudge", "latencyCost"],
+      "scorerConfig": { "latencyCost": { "maxLatencyMs": 3000 } }
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+node_modules/
+dist/
+coverage/
+.regrade/
+*.db
+*.db-shm
+*.db-wal
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+site/
+
+# Private project docs: never published. No trailing slash on purpose: docs/ may be a real folder, a Windows
+# junction or a macOS symlink into a separate private repo, and only a slash-less pattern matches all three.
+/docs
