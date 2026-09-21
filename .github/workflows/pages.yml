@@ -2,13 +2,12 @@ name: Sample report
 
 # Builds Regrade, runs the deterministic sample (no API keys needed), and publishes the
 # generated comparison report as a static GitHub Pages site so the README can link to a
-# real, clickable report.
-#
-# Manual for now (Actions tab -> "Sample report" -> Run workflow), so it does not fail on every push
-# while Pages is off. To use it: enable Pages (Settings -> Pages -> Source: GitHub Actions), then add
-# the `push: branches: [main]` trigger back here to publish on every push to main.
+# real, clickable report. Requires Pages to be enabled (Settings -> Pages -> Source: GitHub Actions).
+# Runs on every push to main so the published page always matches the code, and can be run by hand.
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:

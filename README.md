@@ -4,6 +4,8 @@
 
 **Regression tests for AI agents and RAG pipelines. Git diff for AI behavior.**
 
+**[See a live sample report →](https://dhrumilbhut.github.io/regrade/)** (a healthy pipeline vs a degraded one: which cases regressed, and is it real or noise?)
+
 Regrade runs a suite of test cases through your real pipeline, scores every output, saves the run, and exits non-zero when something broke, so a prompt or model change can't quietly make your app worse.
 
 - **Vendor-neutral.** MIT, no telemetry, no default provider. Test any HTTP endpoint, OpenAI-compatible API, or Anthropic model on equal footing.
@@ -246,6 +248,8 @@ regrade compare · support-bot
 `--fail-on-regression` fails on any regressed case (significant or not, because single-attempt suites can't do better), on any case that errored in the head run, and on a significant overall drop. `--significant-only` ignores regressions that aren't statistically significant. The tests check the statistics against textbook reference values and, by simulation, that the overall test rejects under 9% of the time when nothing changed and over 95% of the time for a real drop.
 
 ## Reports
+
+A [live example](https://dhrumilbhut.github.io/regrade/) is published from the deterministic sample (`npm run sample-report`).
 
 - **HTML:** `regrade report <run> [--against <base>] --out report.html` writes one self-contained file: no network access, no external assets, opens from `file://`, light and dark themes, filter and search, and per-case drill-down with inputs, outputs, scores and judge reasoning. Pipeline outputs are untrusted text and are only ever inserted as text, never HTML. Try the deterministic sample with `npm run sample-report`, which writes `site/index.html`.
 - **Markdown:** `regrade run --md summary.md` and `regrade compare --md compare.md` write GitHub-flavoured summaries, ready for a CI job summary (`cat summary.md >> "$GITHUB_STEP_SUMMARY"`) or a PR comment.
