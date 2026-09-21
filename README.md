@@ -15,7 +15,7 @@ Regrade runs a suite of test cases through your real pipeline, scores every outp
 
 ## Install
 
-Requires **Node.js 22.14 or newer**.
+Requires **Node.js 24 or newer** (the current LTS).
 
 ```bash
 # once published to npm
@@ -35,7 +35,7 @@ node regrade/mock-pipeline.mjs &   # start the mock pipeline (or use a second te
 regrade run regrade/suite.json
 ```
 
-Prefer code? `regrade init --ts && regrade run regrade/suite.mts` scaffolds a [TypeScript suite](#code-suites-typescript-or-javascript) that needs no server at all (Node 22.18+).
+Prefer code? `regrade init --ts && regrade run regrade/suite.mts` scaffolds a [TypeScript suite](#code-suites-typescript-or-javascript) that needs no server at all.
 
 ```
 regrade 0.1.0 · my-first-suite · http → localhost:4000/pipeline
@@ -196,7 +196,7 @@ export default {
 ```
 
 - **What is allowed:** everything a JSON suite has, plus `scorers` (name → function) and a `pipeline` with a `run` function. Built-in scorers (`exactMatch`, `llmJudge`, `latencyCost`) sit alongside yours. A scorer may also be an object `{ score, requiresExpected?, preflight?, fingerprint? }`. `export default` may be an (async) function that returns the suite.
-- **Node version:** `.ts` / `.mts` suites need **Node 22.18+**, which imports TypeScript natively by stripping types: no loader, no build step, no extra dependency. That means type syntax only (no `enum`, `namespace` or parameter properties), and local imports must include the `.ts` extension. `import type { CodeSuite } from "regrade"` is erased, so `npx regrade` works without installing anything in your project (a *value* import such as `defineSuite` needs `npm i -D regrade`). On Node 22.14–22.17 use a `.mjs` suite (same shape, plain JavaScript) or JSON; Regrade explains this if you try a `.ts` file.
+- **TypeScript without tooling:** Node imports `.ts` / `.mts` files natively by stripping types: no loader, no build step, no extra dependency. That means type syntax only (no `enum`, `namespace` or parameter properties), and local imports must include the `.ts` extension. `import type { CodeSuite } from "regrade"` is erased, so `npx regrade` works without installing anything in your project (a *value* import such as `defineSuite` needs `npm i -D regrade`). Prefer plain JavaScript? A `.mjs` suite has the same shape.
 - **File extension and module type:** suites are ES modules. A plain `.ts` (or `.js`) file is treated as an ES module only if your `package.json` says `"type": "module"`; `npm init` writes `"type": "commonjs"`, in which case use **`.mts`** / **`.mjs`** (what `regrade init --ts` does, so it works in any project), and give local helper files the same treatment. Regrade tells you when this is the problem.
 - **Timeouts are enforced for you.** Every attempt and every scorer is bounded by `--timeout` (default 30 s), even if your code ignores the `AbortSignal` it is given; a hung function becomes an *errored* attempt, not a hung run.
 - **Editing a scorer is a change, not a regression.** Each inline scorer is fingerprinted from its source, and the fingerprint is part of its cases' identity, so after you edit one, `regrade compare` reports those cases as `modified` instead of comparing results produced by different logic. (Changes in code the scorer *imports* are not detected: bump `fingerprint` if you keep logic in a helper.)
@@ -357,7 +357,7 @@ npm run check     # lint + typecheck + tests (builds first; e2e tests spawn the 
 npm run build     # dist/ and schema/suite.schema.json
 ```
 
-Useful scripts: `npm run test:watch`, `npm run lint`, `npm run typecheck`, `npm run sample-report` (a deterministic sample comparison report in `site/`). Node.js 22.14+ (24 LTS recommended); `.ts` code suites need 22.18+.
+Useful scripts: `npm run test:watch`, `npm run lint`, `npm run typecheck`, `npm run sample-report` (a deterministic sample comparison report in `site/`). Node.js 24 or newer.
 
 ## Contributing
 

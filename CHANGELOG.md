@@ -6,6 +6,9 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- **Node.js 24 is now the supported (and CI-tested) version**, down from a "22.14 or newer" claim that was never tested in CI. Support for Node 22 may return later; simple and honest for now.
+
 ## [0.3.0]: code suites
 
 Write suites in code: score with your own functions and call your agent in-process.

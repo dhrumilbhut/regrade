@@ -196,7 +196,7 @@ describe("loadSuiteFile", () => {
     expect(err.message).toContain("write the extension in the import");
   });
 
-  it("on a Node that cannot import TypeScript (< 22.18), a .ts suite fails fast with an actionable message, but .mjs still loads", async () => {
+  it("on a Node that cannot import TypeScript (an unsupported old Node), a .ts suite fails fast with an actionable message, but .mjs still loads", async () => {
     const features = process.features as { typescript?: unknown };
     const original = Object.getOwnPropertyDescriptor(features, "typescript");
     Object.defineProperty(features, "typescript", { value: false, configurable: true });
@@ -206,7 +206,7 @@ describe("loadSuiteFile", () => {
       const err = (await loadSuiteFile(ts).catch((e: unknown) => e)) as Error;
       expect(err).toBeInstanceOf(ConfigError);
       expect(err.message).toContain("cannot import TypeScript files");
-      expect(err.message).toContain("Node 22.18 or newer");
+      expect(err.message).toContain("Node.js 24 or newer");
       expect(err.message).toContain("write the suite as .mjs or .json");
       expect((await loadSuiteFile(writeSuite(dir, "ok.mjs", validModule))).kind).toBe("code");
     } finally {

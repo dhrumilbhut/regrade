@@ -127,7 +127,7 @@ changed (or that only exist in one run, or errored) are listed but never counted
     .description("Scaffold an example suite (and a mock pipeline, or with --ts a code-first suite)")
     .option("--dir <dir>", "directory to create", "regrade")
     .option("--force", "overwrite existing files")
-    .option("--ts", "scaffold a code-first TypeScript suite instead (Node 22.18+; no mock server needed)")
+    .option("--ts", "scaffold a code-first TypeScript suite instead (no mock server needed)")
     .action((opts: { dir: string; force?: boolean; ts?: boolean }) => {
       initCommand(opts);
     });

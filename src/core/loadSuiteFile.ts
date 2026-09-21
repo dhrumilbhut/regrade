@@ -39,7 +39,7 @@ export async function loadSuiteFile(path: string, base: Registry = createRegistr
   if (TS_EXT.has(ext) && !canImportTypeScript()) {
     throw new ConfigError(
       `Cannot load ${path}: this Node.js (${process.version}) cannot import TypeScript files. ` +
-        "TypeScript suites need Node 22.18 or newer (native type stripping). Upgrade Node, or write the suite as .mjs or .json.",
+        "Regrade needs Node.js 24 or newer (native TypeScript support). Upgrade Node, or write the suite as .mjs or .json.",
     );
   }
 

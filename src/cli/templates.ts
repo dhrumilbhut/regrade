@@ -64,7 +64,7 @@ createServer((req, res) => {
 `;
 
 export const INIT_TS_SUITE = `// A code-first suite. Run it with:  regrade run regrade/suite.mts
-// TypeScript suites need Node 22.18+ (native type stripping). The .mts extension makes this an ES module whatever
+// Node runs TypeScript natively by stripping types. The .mts extension makes this an ES module whatever
 // your package.json says; with "type": "module" you may rename it to suite.ts. Prefer JSON? Run \`regrade init\`.
 import type { CodeSuite } from "regrade"; // type-only: erased at runtime, so no local install is needed to run it
 

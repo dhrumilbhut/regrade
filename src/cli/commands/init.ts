@@ -50,7 +50,7 @@ export function initCommand(opts: InitOptions): { written: string[]; skipped: st
   log("");
   log("Next:");
   if (opts.ts) {
-    log(`  regrade run ${opts.dir}/suite.mts     # needs Node 22.18+; no server or API key required`);
+    log(`  regrade run ${opts.dir}/suite.mts     # no server or API key required`);
   } else {
     log(`  1. node ${opts.dir}/mock-pipeline.mjs      # start the mock pipeline (leave running)`);
     log(`  2. regrade run ${opts.dir}/suite.json      # in another terminal`);
