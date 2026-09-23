@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- **HTML report restyled** to match the documentation site: new light and dark palettes, larger type for the summary figures, accent-coloured filters and open cases, softer cards and code blocks. Same single self-contained file, same features. The report and the website now share the saved theme choice.
+- Documentation website: redesigned landing page with light and dark themes and a theme toggle.
+
 ## [0.4.1]: documentation
 
 No code changes: a rewritten README (which is what npm shows), a documentation website, and llms.txt.

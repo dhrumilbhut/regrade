@@ -92,7 +92,11 @@ const cmp = compareRuns({ base: { run: base.run, attempts: base.attempts }, head
 const gate = regressionGate(cmp);
 const headReport = buildRunReport(head.run, head.attempts);
 
-writeFileSync(join(outDir, "index.html"), renderHtmlReport({ report: headReport, comparison: cmp, version: pkg.version }));
+// On the website, a thin bar leads back to the docs; `regrade report` itself never adds it.
+const siteBar = outDir.replace(/\\/g, "/").endsWith("/sample")
+  ? `<div style="border-bottom:1px solid var(--border);background:var(--surface);font-size:13.5px;color:var(--ink2)"><div style="max-width:1120px;margin:0 auto;padding:10px 20px;display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center"><a href="../" style="color:var(--accent);text-decoration:none;font-weight:600">← Regrade docs</a><span>A sample of the single-file report that <code>regrade report</code> writes: a healthy pipeline compared with a degraded one.</span></div></div>`
+  : "";
+writeFileSync(join(outDir, "index.html"), renderHtmlReport({ report: headReport, comparison: cmp, version: pkg.version }).replace("<body>", `<body>${siteBar}`));
 writeFileSync(join(outDir, "compare.md"), renderCompareMarkdown(cmp, gate, pkg.version));
 writeFileSync(join(outDir, "run.md"), renderRunMarkdown(headReport, pkg.version));
 writeFileSync(join(outDir, "report.json"), JSON.stringify({ report: headReport, comparison: cmp }, null, 2));

@@ -105,7 +105,7 @@ describe("documentation site", () => {
     for (const page of pages) {
       const html = read(page);
       expect(html, rel(page)).toContain('<button class="theme" id="theme" type="button"');
-      const early = html.indexOf('localStorage.getItem("regrade-site-theme")');
+      const early = html.indexOf('localStorage.getItem("regrade-theme")');
       expect(early, rel(page)).toBeGreaterThan(-1);
       expect(early, `${rel(page)}: theme must be applied before the stylesheet`).toBeLessThan(html.indexOf("<style>"));
       expect(html).toContain(':root[data-theme="dark"]');

@@ -392,13 +392,13 @@ th { color: var(--ink2); font-weight: 600; background: var(--code-bg); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 `;
 
-const THEME_EARLY = `try{var t=localStorage.getItem("regrade-site-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}`;
+const THEME_EARLY = `try{var t=localStorage.getItem("regrade-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}`;
 
 const THEME_AND_COPY = `(function(){
 var b=document.getElementById("theme");
 function cur(){var a=document.documentElement.getAttribute("data-theme");return a||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light")}
 function sync(){if(!b)return;var d=cur()==="dark";b.setAttribute("aria-label",d?"Switch to light theme":"Switch to dark theme");b.title=b.getAttribute("aria-label")}
-if(b){b.addEventListener("click",function(){var n=cur()==="dark"?"light":"dark";document.documentElement.setAttribute("data-theme",n);try{localStorage.setItem("regrade-site-theme",n)}catch(e){}sync()});sync()}
+if(b){b.addEventListener("click",function(){var n=cur()==="dark"?"light":"dark";document.documentElement.setAttribute("data-theme",n);try{localStorage.setItem("regrade-theme",n)}catch(e){}sync()});sync()}
 function copyButton(host,text){var c=document.createElement("button");c.type="button";c.className="copy";c.textContent="Copy";c.addEventListener("click",function(){if(!navigator.clipboard)return;navigator.clipboard.writeText(text()).then(function(){c.textContent="Copied";setTimeout(function(){c.textContent="Copy"},1400)},function(){})});host.appendChild(c)}
 document.querySelectorAll("pre:not(.plain)").forEach(function(p){copyButton(p,function(){var c=p.querySelector("code");return (c||p).textContent})});
 document.querySelectorAll(".install").forEach(function(el){copyButton(el,function(){return el.querySelector("code").textContent})});
