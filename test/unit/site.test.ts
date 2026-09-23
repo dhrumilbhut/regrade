@@ -38,7 +38,7 @@ describe("documentation site", () => {
     const broken: string[] = [];
     for (const page of pages) {
       for (const [, href] of read(page).matchAll(/href="([^"]+)"/g)) {
-        if (/^(https?:|mailto:)/.test(href!)) continue;
+        if (/^(https?:|mailto:|data:)/.test(href!)) continue; // external, or the inline favicon
         const [path, anchor] = href!.split("#") as [string, string | undefined];
         if (path === "sample/" || path.endsWith("/sample/")) continue; // written by scripts/sample-report.mjs
         let target = path === "" ? page : resolve(dirname(page), path);
@@ -99,6 +99,26 @@ describe("documentation site", () => {
     expect(read(join(out, "robots.txt"))).toContain("Sitemap: https://dhrumilbhut.github.io/regrade/sitemap.xml");
     expect(read(join(out, "llms.txt"))).toMatch(/^# Regrade\n\n> /);
     expect(read(join(out, "llms-full.txt"))).toBe(read(join(root, "README.md")));
+  });
+
+  it("supports light and dark themes: system preference by default, a toggle, and the saved choice applied before first paint", () => {
+    for (const page of pages) {
+      const html = read(page);
+      expect(html, rel(page)).toContain('<button class="theme" id="theme" type="button"');
+      const early = html.indexOf('localStorage.getItem("regrade-site-theme")');
+      expect(early, rel(page)).toBeGreaterThan(-1);
+      expect(early, `${rel(page)}: theme must be applied before the stylesheet`).toBeLessThan(html.indexOf("<style>"));
+      expect(html).toContain(':root[data-theme="dark"]');
+      expect(html).toContain('@media (prefers-color-scheme: dark)');
+      expect(html).toContain(':root:not([data-theme="light"])');
+    }
+  });
+
+  it("the landing page leads with the definition, a copyable install command and the main sections", () => {
+    const html = read(join(out, "index.html"));
+    expect(html).toMatch(/<h1>Regression testing for <span>LLM apps<\/span>, AI agents and RAG pipelines<\/h1>/);
+    expect(html).toContain('<div class="install"><code>npx regrade init --ts &amp;&amp; npx regrade run regrade/suite.mts</code></div>');
+    for (const id of ["features", "how-it-works", "how-to-guides", "reference"]) expect(html).toContain(`id="${id}"`);
   });
 
   it("escapes HTML in code examples", () => {
