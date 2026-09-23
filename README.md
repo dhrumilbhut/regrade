@@ -318,7 +318,7 @@ Judge scores are useful, but **they are not ground truth**. Studies find raw jud
 - **Self-preference warning.** Regrade warns when the judge model is the same as the pipeline model (judges favour their own output).
 - **Changing the judge is a change, not a regression.** The judge model is part of each judged case's identity, so `regrade compare` reports those cases as `modified` when two runs used different judges.
 
-**Choosing a judge model.** Pick by measured cost per verdict, not list price: reasoning models can spend hundreds of hidden tokens on one verdict. In a small test (2026-09-23), `gpt-5-nano` (the lowest list price) used 400 to 900 output tokens per verdict and cost about ten times more than `gpt-4.1-nano` or `gpt-6-luna`, which used about 40.
+**Choosing a judge model.** Pick by measured cost per verdict, not list price: reasoning models can spend hundreds of hidden tokens on one verdict. In a small test (2026-09-23, two to four verdicts per model), `gpt-5-nano` (the lowest list price) used 376 to 888 output tokens per verdict, mostly hidden reasoning, and cost 5 to 12 times as much per verdict as `gpt-4.1-nano` or `gpt-6-luna`, which used 40 to 60.
 
 It is still a single LLM making a judgment. Use an exact or programmatic check where you can, and treat judge results as one signal. Calibrating judges against human labels is planned.
 
