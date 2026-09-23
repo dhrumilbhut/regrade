@@ -19,6 +19,8 @@ export type { CaseOutcome } from "./core/verdict.js";
 export { withRetry } from "./core/retry.js";
 export { SqliteStore } from "./store/sqliteStore.js";
 export type { Store, NewRun } from "./store/store.js";
+export { buildRunFile, parseRunFile, readRunFile, serializeRunFile, writeRunFile, RUN_FILE_KIND, RUN_FILE_VERSION } from "./store/runFile.js";
+export type { RunFile, LoadedRun } from "./store/runFile.js";
 export { computeCost, defaultPrices, mergePrices } from "./pricing/cost.js";
 export type { PriceTable, PriceEntry } from "./pricing/cost.js";
 export { buildRunReport } from "./report/model.js";

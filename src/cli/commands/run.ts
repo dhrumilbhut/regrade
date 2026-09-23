@@ -9,6 +9,7 @@ import type { PriceEntryInput } from "../../core/types.js";
 import { createConsoleReporter } from "../../report/console.js";
 import { renderRunMarkdown } from "../../report/markdown.js";
 import { buildRunReport, writeJsonReport } from "../../report/model.js";
+import { buildRunFile, writeRunFile } from "../../store/runFile.js";
 import { SqliteStore } from "../../store/sqliteStore.js";
 import { VERSION } from "../version.js";
 
@@ -18,6 +19,10 @@ export interface RunCommandOptions {
   db?: string;
   json?: string;
   md?: string;
+  /** Also write a portable run file. */
+  export?: string;
+  /** With --export: keep only what a comparison needs. */
+  compact?: boolean;
   minPassRate?: number;
   concurrency?: number;
   repeat?: number;
@@ -116,6 +121,12 @@ export async function runCommand(suitePath: string, o: RunCommandOptions): Promi
       mkdirSync(dirname(o.md), { recursive: true });
       writeFileSync(o.md, renderRunMarkdown(report, VERSION), "utf8");
       process.stdout.write(`  markdown report → ${o.md}\n`);
+    }
+    if (o.export) {
+      const run = store.getRun(outcome.run.runId) ?? outcome.run;
+      writeRunFile(o.export, buildRunFile(run, outcome.attempts, { regradeVersion: VERSION, compact: o.compact }));
+      process.stdout.write(`  run file → ${o.export}${o.compact ? " (compact)" : ""}
+`);
     }
     return outcome.exitCode;
   } finally {

@@ -240,7 +240,7 @@ regrade compare · support-bot
   overall change     mean per case -21.7 pts, 95% CI [-28.3 pts, -15.0 pts], p=0.0015 → significant regression
 ```
 
-`regrade compare` takes `[base] [head]` run ids (unique prefixes work). With one id it compares that run with the run before it; with none, the latest two. Add `--fail-on-regression` to make it a CI gate (exit 1), `--json` / `--md` to write the result, and `--all` to list unchanged cases. `regrade report <run> --against <base> --out report.html` writes the same comparison as a [single-file HTML report](#reports).
+`regrade compare` takes `[base] [head]`: run ids (unique prefixes work) or [run files](#baselines-and-ci-fail-the-pull-request-that-made-things-worse). With one run id it compares that run with the run before it; with one run file, that file (as the baseline) with the latest run of its suite; with none, the latest two. Add `--fail-on-regression` to make it a CI gate (exit 1), `--json` / `--md` to write the result, and `--all` to list unchanged cases. `regrade report <run> --against <base> --out report.html` writes the same comparison as a [single-file HTML report](#reports).
 
 **How it decides.** Model outputs are random, so one run each is rarely enough to call a regression. Regrade is explicit about what it knows:
 
@@ -249,6 +249,106 @@ regrade compare · support-bot
 - **Never compared:** a case whose definition changed between the runs (`modified`, which includes a different judge model for judged cases), a case in only one run (`new` / `removed`), and a case with an errored attempt (`errored`: no verdict). They are listed, never counted as regressions.
 
 `--fail-on-regression` fails on any regressed case (significant or not, because single-attempt suites can't do better), on any case that errored in the head run, and on a significant overall drop. `--significant-only` ignores regressions that aren't statistically significant. The tests check the statistics against textbook reference values and, by simulation, that the overall test rejects under 9% of the time when nothing changed and over 95% of the time for a real drop.
+
+## Baselines and CI: fail the pull request that made things worse
+
+`compare` needs a run to compare against, and a CI job starts with an empty `.regrade/` directory. **Run files** fill that gap: a portable JSON copy of a run, with every attempt's case hash, so `compare` still tells a changed case from a regression.
+
+```bash
+regrade run suite.json --repeat 3 --export run.json    # write a run file as part of a run
+regrade export <run> --out run.json                    # or export a saved run (no --out: print it)
+regrade compare base.json head.json                    # compare two files: no database needed
+regrade compare regrade.baseline.json                  # a file alone is the base, vs the latest run of its suite
+regrade report <run> --against regrade.baseline.json --out report.html
+regrade import run.json                                # load a full run file into the database
+```
+
+**Compact run files** (`--compact`) keep only what a comparison needs: case ids and hashes, attempt statuses, latency, cost and each scorer's pass/fail. They leave out inputs, expected answers, outputs, error messages and judge reasoning, so they are small and safe to commit. They can be compared against, but not imported or turned into a report of their own.
+
+(A `--json` report is not a run file: it has no case hashes, so it can't be used as a baseline.)
+
+### Recipe 1: a committed baseline (recommended)
+
+Keep `regrade.baseline.json` in the repository. Every pull request compares against it, and moving the baseline is an ordinary, reviewed commit, so the git history doubles as the history of your pipeline's quality.
+
+Create or update the baseline when the pipeline is in a state you accept:
+
+```bash
+regrade run regrade/suite.json --repeat 3 --export regrade.baseline.json --compact
+git add regrade.baseline.json && git commit -m "Update Regrade baseline"
+```
+
+Then gate pull requests (`.github/workflows/regrade.yml`):
+
+```yaml
+name: Regrade
+on: pull_request
+
+jobs:
+  regrade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      # Start your pipeline here if the suite calls it over HTTP.
+      - name: Run the suite
+        # Exit 1 (some cases failed) is fine here: the comparison decides. Exit 2 (bad config) still fails.
+        run: npx regrade@0.4 run regrade/suite.json --repeat 3 || test $? -eq 1
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      - name: Compare with the baseline
+        run: npx regrade@0.4 compare regrade.baseline.json --fail-on-regression --md regrade.md
+      - name: Job summary
+        if: always()
+        run: cat regrade.md >> "$GITHUB_STEP_SUMMARY"
+```
+
+Use the same `--repeat` for the baseline and the pull request runs: more attempts per case give the comparison more power (see [how it decides](#compare-runs-what-regressed-and-is-it-real)). If the pull request deliberately changes cases, they show as `modified` and don't fail the gate; update the baseline in the same pull request.
+
+### Recipe 2: the latest run on main as the baseline
+
+No committed file: every push to `main` uploads its run, and pull requests compare against the newest one. Less ceremony, but the baseline moves without review.
+
+```yaml
+name: Regrade
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  regrade:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read   # to download main's run
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Run the suite
+        run: npx regrade@0.4 run regrade/suite.json --repeat 3 --export run.json --compact || test $? -eq 1
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      - name: Keep main's run as the baseline
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v7
+        with:
+          name: regrade-baseline
+          path: run.json
+      - name: Compare with main
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          id=$(gh run list --workflow regrade.yml --branch main --event push --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+          gh run download "$id" --name regrade-baseline --dir baseline
+          npx regrade@0.4 compare baseline/run.json run.json --fail-on-regression --md regrade.md
+          cat regrade.md >> "$GITHUB_STEP_SUMMARY"
+```
 
 ## Reports
 
@@ -302,6 +402,7 @@ regrade run <suite> [options]     Run a suite (.json, or a code suite: .ts .mts 
   --db <path>                     SQLite file (default .regrade/results.db)
   --json <file>                   also write a JSON report
   --md <file>                     also write a Markdown summary
+  --export <file> [--compact]     also write a run file (--compact: only what a comparison needs)
   --min-pass-rate <0-1>           pass if at least this fraction of attempts pass
   --concurrency <n>               attempts in flight (default 4)
   --repeat <n>                    attempts per case (overrides the suite)
@@ -315,10 +416,12 @@ regrade run <suite> [options]     Run a suite (.json, or a code suite: .ts .mts 
   --no-color                      plain output (also honours NO_COLOR; set REGRADE_ASCII=1 for ASCII symbols)
 regrade runs [--suite <name>] [--limit <n>]        List saved runs, newest first
 regrade show <run> [case] [--full]                 A run's summary, or one case's input, outputs and scores
-regrade compare [base] [head] [options]            What regressed, improved, or is just flaky (see above)
+regrade compare [base] [head] [options]            What regressed, improved, or is just flaky; runs are ids or run files
   --fail-on-regression | --significant-only        exit 1 when the gate fails
   --all  --json <file>  --md <file>  --suite <name>
-regrade report <run> [--against <base>] [--out <file>]   Single-file HTML report
+regrade report <run> [--against <base>] [--out <file>]   Single-file HTML report (runs are ids or run files)
+regrade export <run> [--out <file>] [--compact]    Write a run file (a baseline to commit, or to compare or import elsewhere)
+regrade import <file>                              Load a full run file into the database
 regrade init [--dir <dir>] [--force] [--ts]   Scaffold an example suite (--ts: a code suite, no server needed)
 regrade schema [--out <file>]          Print the suite JSON Schema
 ```

@@ -4,7 +4,7 @@ import { renderComparison } from "../../report/compareConsole.js";
 import { renderCompareMarkdown } from "../../report/markdown.js";
 import { compareRuns, regressionGate } from "../../stats/compare.js";
 import { VERSION } from "../version.js";
-import { loadRun, openExistingStore, pickComparison } from "./common.js";
+import { RunSource } from "./common.js";
 
 export interface CompareOptions {
   db?: string;
@@ -24,10 +24,10 @@ function write(path: string, text: string): void {
 
 /** Returns the exit code: 0, or 1 if --fail-on-regression and the gate failed. Throws ConfigError for exit 2. */
 export function compareCommand(refs: string[], o: CompareOptions): number {
-  const store = openExistingStore(o.db);
+  const source = new RunSource(o.db);
   try {
-    const { base, head } = pickComparison(store, refs, o.suite);
-    const cmp = compareRuns({ base: loadRun(store, base.runId), head: loadRun(store, head.runId) });
+    const { base, head } = source.pick(refs, o.suite);
+    const cmp = compareRuns({ base, head });
     const gate = o.failOnRegression || o.significantOnly ? regressionGate(cmp, { significantOnly: o.significantOnly }) : undefined;
 
     process.stdout.write(renderComparison(cmp, { all: o.all, color: o.color === false ? false : undefined, gate }));
@@ -41,6 +41,6 @@ export function compareCommand(refs: string[], o: CompareOptions): number {
     }
     return gate?.failed ? 1 : 0;
   } finally {
-    store.close();
+    source.close();
   }
 }

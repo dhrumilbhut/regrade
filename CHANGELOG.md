@@ -7,6 +7,8 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- **Baselines for CI: run files.** `regrade export <run>` and `regrade run --export <file>` write a portable, versioned run file that keeps every attempt's case hash. `--compact` keeps only what a comparison needs (no inputs, outputs, error text or judge reasoning), so a baseline is small and safe to commit. `compare` and `report --against` accept run files wherever they take a run id (`regrade compare base.json head.json` needs no database; a file alone is the baseline for the latest run of its suite), and `regrade import` loads a full run file into a database. The README has two GitHub Actions recipes: a committed baseline, and the latest run on main.
+- Library: `buildRunFile`, `parseRunFile`, `readRunFile`, `writeRunFile`, `serializeRunFile`, `SqliteStore.importRun`.
 - **The judge is checked before the run.** One trivial call per judge model before any case runs; a judge that cannot give a valid verdict stops the run with exit 2 and the reason, instead of erroring every attempt. `--no-judge-check` (or `judgeCheck: false` in the library) skips it.
 - **Every judge verdict records which model produced it and at what temperature** (`0`, or `default` for models that reject 0), shown by `regrade show` and the HTML report. A judge that runs at its default temperature triggers a warning, since its verdicts can vary more between runs.
 - Library: a scorer's `preflight` may be async, and receives `signal`, `warn` and `liveChecks`; `ScoreResult.metadata` is stored with the score (all additive). The database schema moves to version 2 (`scores.metadata_json`); existing databases upgrade automatically.

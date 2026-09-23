@@ -2,6 +2,7 @@ import { Command, CommanderError, InvalidArgumentError } from "commander";
 import pc from "picocolors";
 import { ConfigError, errorMessage } from "../core/errors.js";
 import { compareCommand } from "./commands/compare.js";
+import { exportCommand, importCommand } from "./commands/export.js";
 import { initCommand } from "./commands/init.js";
 import { reportCommand } from "./commands/report.js";
 import { runsCommand } from "./commands/runs.js";
@@ -45,6 +46,8 @@ export function buildProgram(): Command {
     .option("--db <path>", "SQLite database to save results to", ".regrade/results.db")
     .option("--json <file>", "also write a JSON report to this file")
     .option("--md <file>", "also write a Markdown summary (e.g. for a CI job summary)")
+    .option("--export <file>", "also write a portable run file (a baseline, or to compare or import elsewhere)")
+    .option("--compact", "with --export: keep only what a comparison needs (no inputs or outputs); safe to commit")
     .option("--min-pass-rate <rate>", "pass if at least this fraction of attempts pass (0-1), instead of requiring every case", rateOption)
     .option("--concurrency <n>", "max attempts in flight (default 4)", intOption("--concurrency", 1, 32))
     .option("--repeat <n>", "attempts per case (overrides the suite)", intOption("--repeat", 1, 50))
@@ -91,7 +94,7 @@ Exit codes:
   program
     .command("compare")
     .description("Compare two runs: what regressed, what improved, and whether it is real or noise")
-    .argument("[runs...]", "base and head run ids; with one, compares it with the run before it; with none, the latest two")
+    .argument("[runs...]", "base and head: run ids or run files. One run id: it vs the run before it. One run file: it (as the baseline) vs the latest run of its suite. None: the latest two")
     .option("--db <path>", "results database", ".regrade/results.db")
     .option("--suite <name>", "with no run ids: which suite's latest runs to compare")
     .option("--all", "also list unchanged cases")
@@ -113,10 +116,26 @@ changed (or that only exist in one run, or errored) are listed but never counted
     });
 
   program
+    .command("export")
+    .description("Write a run to a portable run file: a baseline to commit, or a run to compare or import elsewhere")
+    .argument("<run>", "run id or a unique prefix of it")
+    .option("--out <file>", "file to write (default: print to stdout)")
+    .option("--compact", "keep only what a comparison needs (no inputs, outputs or judge reasoning); safe to commit")
+    .option("--db <path>", "results database", ".regrade/results.db")
+    .action((run: string, opts) => exportCommand(run, opts));
+
+  program
+    .command("import")
+    .description("Load a run file into the results database (a run that is already there is skipped)")
+    .argument("<file>", "a full run file (compact files can be compared against, not imported)")
+    .option("--db <path>", "results database", ".regrade/results.db")
+    .action((file: string, opts) => importCommand(file, opts));
+
+  program
     .command("report")
     .description("Write a single-file, self-contained HTML report for a run")
-    .argument("<run>", "run id or a unique prefix of it (the head run when using --against)")
-    .option("--against <run>", "base run: adds a comparison against it")
+    .argument("<run>", "run id (or a unique prefix) or run file; the head run when using --against")
+    .option("--against <run>", "base run id or run file: adds a comparison against it")
     .option("--out <file>", "output file", "regrade-report.html")
     .option("--db <path>", "results database", ".regrade/results.db")
     .action((run: string, opts) => {

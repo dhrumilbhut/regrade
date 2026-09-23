@@ -131,6 +131,15 @@ export class SqliteStore implements Store {
     })();
   }
 
+  /** Insert a complete run (e.g. from a run file) atomically: all of it or nothing. */
+  importRun(run: RunRecord, attempts: readonly AttemptRecord[], summary: RunSummary): void {
+    this.db.transaction(() => {
+      this.createRun(run);
+      for (const a of attempts) this.saveAttempt(run.runId, a);
+      if (run.status !== "running") this.finishRun(run.runId, run.status, run.finishedAt ?? run.startedAt, summary);
+    })();
+  }
+
   finishRun(runId: string, status: RunStatus, finishedAt: string, summary: RunSummary): void {
     this.db
       .prepare(`UPDATE runs SET status = ?, finished_at = ?, summary_json = ? WHERE run_id = ?`)
