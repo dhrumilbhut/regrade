@@ -5,7 +5,9 @@ import { abortMessage } from "./http.js";
  * interrupts binding for user code (inline scorers, custom adapters) that ignores the signal it is given;
  * the abandoned work keeps running in the background but can no longer hold up the run.
  */
-export function raceAbort<T>(work: Promise<T>, signal: AbortSignal, describe: (why: string) => Error): Promise<T> {
+export function raceAbort<T>(value: T | Promise<T>, signal: AbortSignal, describe: (why: string) => Error): Promise<T> {
+  // plain JavaScript scorers and adapters sometimes return a value instead of a Promise: accept both
+  const work = Promise.resolve(value);
   return new Promise<T>((resolve, reject) => {
     const onAbort = () => reject(describe(abortMessage(signal)));
     if (signal.aborted) {

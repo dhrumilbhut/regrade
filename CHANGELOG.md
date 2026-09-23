@@ -16,6 +16,9 @@ All notable changes to this project are documented here. The format follows
 - Library: `buildRunFile`, `parseRunFile`, `readRunFile`, `writeRunFile`, `serializeRunFile`, `SqliteStore.importRun`; `tracer`, `prepareTrace`, `flattenTrace`, `toolCalled`, `maxSteps`; `Store.getAttempts(runId, { traces })` (additive).
 - Library: a scorer's `preflight` may be async, and receives `signal`, `warn` and `liveChecks`; `ScoreResult.metadata` is stored with the score (all additive). The database schema moves to version 3 (`scores.metadata_json`; a `traces` table; cache-write and reasoning token columns); existing databases upgrade automatically.
 
+### Fixed
+- A registered scorer or adapter whose function returns a plain value instead of a Promise (easy to do in plain JavaScript) failed with "work.then is not a function"; plain values are now accepted.
+
 ### Changed
 - `toolCalled` and `maxSteps` are now built-in names: an inline scorer in a code suite with one of those names must be renamed.
 

@@ -74,6 +74,16 @@ describe("runSuite: outcomes and exit codes", () => {
     expect(out.cases.find((c) => c.caseId === "ok")?.verdict).toBe("passed");
   });
 
+  it("accepts a registered scorer whose score() returns a plain value instead of a Promise", async () => {
+    const { mock } = await setup();
+    const reg = registry();
+    const sync = { name: "syncScorer", score: () => ({ pass: true, value: 1, reasoning: "sync" }) };
+    reg.registerScorer(sync as unknown as Parameters<typeof reg.registerScorer>[0]);
+    const out = await run(httpSuite(mock.url, [{ id: "c", input: "What is 2 + 2?", scorers: ["syncScorer"] }]), { registry: reg });
+    expect(out.exitCode).toBe(0);
+    expect(out.attempts[0]?.scores[0]).toMatchObject({ pass: true, reasoning: "sync" });
+  });
+
   it("a scorer that cannot evaluate makes the attempt errored, never a pass", async () => {
     const { mock } = await setup();
     const out = await run(
