@@ -160,6 +160,7 @@ ul.scores { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-d
 ul.scores li { display: flex; gap: 8px; align-items: flex-start; }
 ul.scores .sn { font-weight: 600; min-width: 96px; }
 ul.scores .sr { color: var(--ink2); overflow-wrap: anywhere; }
+ul.scores .sm { color: var(--muted); font-size: 12px; margin-top: 2px; }
 .empty { color: var(--ink2); padding: 16px; text-align: center; }
 footer { color: var(--ink2); font-size: 12px; margin-top: 32px; }
 
@@ -396,7 +397,9 @@ export const JS = String.raw`
       a.scores.forEach(function (s) {
         var m = s.error ? ST.errored : (s.pass ? ST.passed : ST.failed);
         list.appendChild(h('li', null, badgeOf(m), h('span', { class: 'sn', text: s.scorerName }),
-          h('span', { class: 'sr', text: s.error ? 'error: ' + s.error : (s.reasoning || (s.pass ? 'passed' : 'failed')) })));
+          h('div', null,
+            h('span', { class: 'sr', text: s.error ? 'error: ' + s.error : (s.reasoning || (s.pass ? 'passed' : 'failed')) }),
+            s.note ? h('div', { class: 'sm', text: s.note }) : null)));
       });
       block.appendChild(list);
     }

@@ -2,7 +2,7 @@ import { ConfigError } from "../../core/errors.js";
 import type { AttemptRecord, RunRecord } from "../../core/types.js";
 import { groupCases } from "../../core/verdict.js";
 import { formatCost, formatMs } from "../../report/console.js";
-import { fmtDate } from "../../report/format.js";
+import { fmtDate, scoreNote } from "../../report/format.js";
 import { colorFor, loadRun, openExistingStore } from "./common.js";
 
 export interface ShowOptions {
@@ -81,6 +81,8 @@ export function renderCaseDetail(run: RunRecord, attempts: AttemptRecord[], case
       const m = s.error ? c.yellow("!") : s.pass ? c.green("✓") : c.red("✗");
       const detail = s.error ? `error: ${s.error}` : (s.reasoning ?? "");
       out.push(`    ${m} ${s.scorerName}${s.value !== null ? c.dim(` (${s.value})`) : ""}${detail ? `  ${detail}` : ""}`);
+      const note = scoreNote(s);
+      if (note) out.push(`      ${c.dim(note)}`);
     }
   }
   return `${out.join("\n")}\n`;

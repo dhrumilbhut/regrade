@@ -234,6 +234,19 @@ describe("runs and show output", () => {
     expect(renderCaseDetail(run("r-2", err), err, "down", false, false)).toContain("error: HTTP 500");
   });
 
+  it("shows which judge scored a verdict, and flags a default temperature", () => {
+    const judged = mk("j", ["passed", "passed"]).map((a, i) => ({
+      ...a,
+      scores: [{ scorerName: "llmJudge", pass: true, value: 1, reasoning: "ok", metadata: { judge: "openai:gpt-6-luna", temperature: i === 0 ? 0 : "default" } }],
+    }));
+    const text = renderCaseDetail(run("r-3", judged), judged, "j", false, false);
+    expect(text).toContain("judge openai:gpt-6-luna\n");
+    expect(text).toContain("judge openai:gpt-6-luna · default temperature");
+    const html = renderHtmlReport({ report: buildRunReport(run("r-3", judged), judged), version: "1" });
+    expect(html).toContain('"note":"judge openai:gpt-6-luna · default temperature"');
+    expect(JS).toContain("s.note");
+  });
+
   it("truncates very long text unless --full, and names the available cases when the id is wrong", () => {
     const attempts = mk("long", ["passed"], { output: "y".repeat(9000) });
     expect(renderCaseDetail(run("r", attempts), attempts, "long", false, false)).toContain("use --full");

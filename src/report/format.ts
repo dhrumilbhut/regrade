@@ -1,3 +1,4 @@
+import type { ScoreRecord } from "../core/types.js";
 import type { RunMeta, CaseChange } from "../stats/compare.js";
 import type { Proportion } from "../stats/wilson.js";
 
@@ -47,4 +48,11 @@ export function countsLine(counts: Record<CaseChange, number>, sep = " · "): st
   return (["regressed", "improved", "flaky", "unchanged", "modified", "new", "removed", "errored"] as CaseChange[])
     .map((k) => `${k} ${counts[k]}`)
     .join(sep);
+}
+
+/** How a score was produced, from its metadata, e.g. `judge openai:gpt-6-luna · default temperature`; "" if nothing to say. */
+export function scoreNote(s: Pick<ScoreRecord, "metadata">): string {
+  const judge = s.metadata?.judge;
+  if (typeof judge !== "string") return "";
+  return s.metadata?.temperature === "default" ? `judge ${judge} · default temperature` : `judge ${judge}`;
 }

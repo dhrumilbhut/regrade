@@ -342,6 +342,8 @@ describe("runSuite: preflight and filters", () => {
     expect(out.exitCode).toBe(0);
     const judgeScore = out.attempts[0]?.scores.find((s) => s.scorerName === "llmJudge");
     expect(judgeScore?.reasoning).toBeTruthy();
+    const stored = store!.getAttempts(out.run.runId)[0]?.scores.find((s) => s.scorerName === "llmJudge");
+    expect(stored?.metadata).toEqual({ judge: "anthropic:claude-sonnet-5", temperature: 0 });
     expect(judgeScore?.costUsd).toBeGreaterThan(0);
     expect(out.summary.costUsd.judge).toBeGreaterThan(0);
     expect(out.summary.costUsd.unknownAttempts).toBe(1); // HTTP pipeline reported no cost

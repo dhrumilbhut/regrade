@@ -139,7 +139,7 @@ export async function runSuite(opts: RunOptions): Promise<RunOutcome> {
   const judge = overrides.judge ?? defaults.judge ?? judgeFromEnv;
   const scorerNames = [...new Set(cases.flatMap((c) => c.scorers))];
   for (const name of scorerNames) {
-    await registry.getScorer(name).preflight?.({ cases, judge, env, signal: opts.signal, liveChecks: overrides.judgeCheck !== false });
+    await registry.getScorer(name).preflight?.({ cases, judge, env, signal: opts.signal, warn, liveChecks: overrides.judgeCheck !== false });
   }
 
   const prices: PriceTable = mergePrices(mergePrices(defaultPrices(), suite.pricing), overrides.prices);
@@ -266,6 +266,7 @@ export async function runSuite(opts: RunOptions): Promise<RunOutcome> {
           costUsd: res.costUsd,
           error: res.error,
           config: testCase.scorerConfig?.[name],
+          metadata: res.metadata,
         });
       }
     }

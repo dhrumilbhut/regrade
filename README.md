@@ -152,10 +152,10 @@ Both LLM adapters accept `apiKeyEnv` (to name a different env var), `inputTempla
 Judge scores are useful, but **they are not ground truth**. Studies find raw judge agreement overstates real accuracy, and judges can be talked into passing bad answers. Regrade takes these precautions:
 
 - The pipeline output is untrusted text. It is fenced inside a per-call random delimiter, and the judge is told everything inside is data, never instructions.
-- The judge must return schema-validated JSON (`{reasoning, verdict}`, reasoning first) using the provider's native structured output, at temperature 0. Models that accept only their default temperature (such as current OpenAI reasoning models) reject that; Regrade then asks again without it, so those judges run at their default temperature.
+- The judge must return schema-validated JSON (`{reasoning, verdict}`, reasoning first) using the provider's native structured output, at temperature 0. Models that accept only their default temperature (such as current OpenAI reasoning models) reject that; Regrade then asks again without it, so those judges run at their default temperature, and it warns you, because their verdicts can vary more between runs.
 - **Checked before the run.** Before any case runs, Regrade asks each judge one trivial question. If the judge cannot answer with a valid verdict (unknown model, bad key, no structured output), the run stops with exit 2 and says why, instead of erroring every attempt. It costs one tiny call per judge; `--no-judge-check` skips it.
 - **Fail closed.** A malformed, refused or failed judge response makes the attempt **errored**, never an implicit pass.
-- Judge spend is recorded separately from pipeline cost.
+- Judge spend is recorded separately from pipeline cost, and every verdict records which judge model produced it and at what temperature (`regrade show` and the HTML report display it).
 - Regrade warns when the judge model is the same as the pipeline model (judges favour their own output).
 - **Changing the judge is a change, not a regression.** The judge model is part of each judged case's identity, so `regrade compare` reports those cases as `modified` when two runs used different judges.
 

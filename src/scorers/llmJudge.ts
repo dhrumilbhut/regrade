@@ -108,14 +108,19 @@ function parseVerdict(text: string): z.infer<typeof verdictSchema> {
  * model, bad key, no structured output) stops the run with a clear message instead of erroring
  * every attempt. Only the shape of the answer is checked, not the verdict.
  */
-async function checkJudge(spec: string, env: Record<string, string | undefined>, runSignal?: AbortSignal): Promise<void> {
+async function checkJudge(
+  spec: string,
+  env: Record<string, string | undefined>,
+  runSignal?: AbortSignal,
+): Promise<{ temperature: 0 | "default" }> {
   const timeout = AbortSignal.timeout(JUDGE_CHECK_TIMEOUT_MS);
   const signal = runSignal ? AbortSignal.any([runSignal, timeout]) : timeout;
   try {
     const prompt = buildJudgePrompt({ rubric: "Is the output the word OK?", input: "Reply with OK.", expected: "OK", output: "OK" });
-    const { res } = await askJudge(judgeEndpoint(spec, env), prompt, signal);
+    const { res, temperature } = await askJudge(judgeEndpoint(spec, env), prompt, signal);
     if (res.refused) throw new JudgeError("the judge refused a trivial request");
     parseVerdict(res.text);
+    return { temperature };
   } catch (err) {
     throw new ConfigError(
       `The judge ${spec} does not work: ${errorMessage(err)}. ` +
@@ -140,7 +145,7 @@ function addCost(total: number | null | undefined, add: number | null): number |
 export const llmJudge: Scorer = {
   name: "llmJudge",
 
-  async preflight({ cases, judge, env, signal, liveChecks }) {
+  async preflight({ cases, judge, env, signal, warn, liveChecks }) {
     const users = cases.filter((c) => c.scorers.includes("llmJudge"));
     if (users.length === 0) return;
     const providers = new Set<string>();
@@ -164,7 +169,14 @@ export const llmJudge: Scorer = {
       }
       specs.add(spec);
     }
-    if (liveChecks !== false) await Promise.all([...specs].map((spec) => checkJudge(spec, env, signal)));
+    if (liveChecks === false) return;
+    const checked = await Promise.all([...specs].map(async (spec) => ({ spec, ...(await checkJudge(spec, env, signal)) })));
+    for (const { spec } of checked.filter((c) => c.temperature === "default")) {
+      warn?.(
+        `the judge ${spec} does not accept temperature 0, so it runs at its default temperature and its verdicts ` +
+          "can vary between runs. Repeat cases (--repeat), or choose a judge that accepts temperature 0.",
+      );
+    }
   },
 
   async score({ input, expected, output, config, runtime }) {
@@ -176,6 +188,7 @@ export const llmJudge: Scorer = {
     if (!spec) return { pass: false, value: null, error: "no judge model configured" };
 
     let cost: number | null = 0;
+    const metadata: Record<string, unknown> = { judge: spec };
     try {
       const ep = judgeEndpoint(spec, runtime.env);
       const prompt = buildJudgePrompt({
@@ -187,7 +200,8 @@ export const llmJudge: Scorer = {
 
       let lastError: unknown;
       for (let attempt = 0; attempt < 2; attempt++) {
-        const { res } = await askJudge(ep, prompt, runtime.signal);
+        const { res, temperature } = await askJudge(ep, prompt, runtime.signal);
+        metadata.temperature = temperature;
         cost = addCost(cost, computeCost(runtime.prices, ep.provider, ep.model, res.usage));
 
         if (res.refused) throw new JudgeError("judge refused to evaluate this output");
@@ -198,6 +212,7 @@ export const llmJudge: Scorer = {
             value: v.verdict === "pass" ? 1 : 0,
             reasoning: v.reasoning,
             costUsd: cost,
+            metadata,
           };
           return result;
         } catch (err) {
@@ -206,7 +221,7 @@ export const llmJudge: Scorer = {
       }
       throw lastError;
     } catch (err) {
-      return { pass: false, value: null, error: errorMessage(err), costUsd: cost };
+      return { pass: false, value: null, error: errorMessage(err), costUsd: cost, metadata };
     }
   },
 };

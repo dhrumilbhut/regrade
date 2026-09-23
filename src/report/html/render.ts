@@ -1,6 +1,7 @@
 import type { AttemptRecord } from "../../core/types.js";
 import type { Comparison } from "../../stats/compare.js";
 import { wilsonInterval } from "../../stats/wilson.js";
+import { scoreNote } from "../format.js";
 import type { RunReport } from "../model.js";
 import { CSS, EARLY_THEME_JS, JS } from "./assets.js";
 
@@ -70,6 +71,7 @@ export function renderHtmlReport(opts: HtmlReportOptions): string {
           reasoning: s.reasoning ? clip(s.reasoning, 4000) : null,
           error: s.error ? clip(s.error, 4000) : null,
           costUsd: s.costUsd ?? null,
+          note: scoreNote(s) || null,
         })),
       })),
     })),

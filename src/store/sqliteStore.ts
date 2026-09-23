@@ -91,8 +91,8 @@ export class SqliteStore implements Store {
                @status, @error, @completedAt)`,
     );
     const insertScore = this.db.prepare(
-      `INSERT INTO scores (result_id, scorer_name, pass, value, reasoning, cost_usd, error, config_json)
-       VALUES (@resultId, @scorerName, @pass, @value, @reasoning, @costUsd, @error, @config)`,
+      `INSERT INTO scores (result_id, scorer_name, pass, value, reasoning, cost_usd, error, config_json, metadata_json)
+       VALUES (@resultId, @scorerName, @pass, @value, @reasoning, @costUsd, @error, @config, @metadata)`,
     );
 
     this.db.transaction(() => {
@@ -125,6 +125,7 @@ export class SqliteStore implements Store {
           costUsd: s.costUsd ?? null,
           error: s.error ?? null,
           config: s.config ? JSON.stringify(s.config) : null,
+          metadata: s.metadata ? JSON.stringify(s.metadata) : null,
         });
       }
     })();
@@ -220,5 +221,6 @@ function mapScore(r: Row): ScoreRecord {
     costUsd: numOrNull(r.cost_usd),
     error: str(r.error) ?? undefined,
     config: r.config_json ? (JSON.parse(String(r.config_json)) as Record<string, unknown>) : undefined,
+    metadata: r.metadata_json ? (JSON.parse(String(r.metadata_json)) as Record<string, unknown>) : undefined,
   };
 }

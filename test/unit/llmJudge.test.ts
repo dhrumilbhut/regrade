@@ -244,6 +244,27 @@ describe("llmJudge cost and preflight", () => {
   });
 });
 
+describe("llmJudge records who judged", () => {
+  it("stores the judge model and temperature 0 with each verdict", async () => {
+    stub = await startStubJudge();
+    const r = await llmJudge.score(scoreArgs({ runtime: runtime(anthropicEnv(), "anthropic:claude-sonnet-5") }));
+    expect(r.metadata).toEqual({ judge: "anthropic:claude-sonnet-5", temperature: 0 });
+  });
+
+  it("records the default temperature when the model rejected 0", async () => {
+    stub = await startStubJudge("notemperature");
+    const r = await llmJudge.score(scoreArgs({ runtime: runtime(openaiEnv(), "openai:gpt-reasoning-meta") }));
+    expect(r.metadata).toEqual({ judge: "openai:gpt-reasoning-meta", temperature: "default" });
+  });
+
+  it("still names the judge when it failed", async () => {
+    stub = await startStubJudge("http400");
+    const r = await llmJudge.score(scoreArgs({ runtime: runtime(openaiEnv(), "openai:gpt-test") }));
+    expect(r.error).toBeDefined();
+    expect(r.metadata).toEqual({ judge: "openai:gpt-test" });
+  });
+});
+
 describe("llmJudge check before the run", () => {
   const judged = (id: string, judge?: string): TestCase => ({
     id,
@@ -284,6 +305,19 @@ describe("llmJudge check before the run", () => {
   it("does not care which verdict the check gets, only that it is a valid one", async () => {
     stub = await startStubJudge("normal", () => "fail");
     await expect(llmJudge.preflight!({ cases: [judged("a")], judge: "openai:gpt-test", env: openaiEnv() })).resolves.toBeUndefined();
+  });
+
+  it("warns, once per judge, when a judge runs at its default temperature; not otherwise", async () => {
+    stub = await startStubJudge("notemperature");
+    const warnings: string[] = [];
+    const warn = (m: string) => warnings.push(m);
+    await llmJudge.preflight!({ cases: [judged("a"), judged("b")], judge: "openai:gpt-reasoning-warn", env: openaiEnv(), warn });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/openai:gpt-reasoning-warn does not accept temperature 0.*--repeat/s);
+    await stub.close();
+    stub = await startStubJudge();
+    await llmJudge.preflight!({ cases: [judged("a")], judge: "openai:gpt-test", env: openaiEnv(), warn });
+    expect(warnings).toHaveLength(1);
   });
 
   it("passes for a model that rejects temperature, and later verdicts skip the rejected try", async () => {

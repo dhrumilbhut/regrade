@@ -193,6 +193,30 @@ describe("SqliteStore", () => {
     expect(() => new SqliteStore(path)).toThrow(/newer than this Regrade/);
   });
 
+  it("stores score metadata and reads it back", () => {
+    const store = open();
+    store.createRun(newRun("m"));
+    const metadata = { judge: "openai:gpt-6-luna", temperature: "default" };
+    store.saveAttempt("m", attempt({ scores: [{ scorerName: "llmJudge", pass: true, value: 1, metadata }, { scorerName: "exactMatch", pass: true, value: 1 }] }));
+    const [a] = store.getAttempts("m");
+    expect(a?.scores[0]?.metadata).toEqual(metadata);
+    expect(a?.scores[1]?.metadata).toBeUndefined();
+  });
+
+  it("upgrades a version 1 database in place, keeping its runs", () => {
+    const path = tmpDb();
+    open(path).close();
+    const raw = new Database(path);
+    raw.exec("ALTER TABLE scores DROP COLUMN metadata_json");
+    raw.pragma("user_version = 1");
+    raw.close();
+    const store = open(path);
+    expect(store.schemaVersion()).toBe(LATEST_SCHEMA_VERSION);
+    store.createRun(newRun("after-upgrade"));
+    store.saveAttempt("after-upgrade", attempt({ scores: [{ scorerName: "llmJudge", pass: true, value: 1, metadata: { judge: "x:y" } }] }));
+    expect(store.getAttempts("after-upgrade")[0]?.scores[0]?.metadata).toEqual({ judge: "x:y" });
+  });
+
   it("rejects an invalid status via CHECK constraints", () => {
     const path = tmpDb();
     const store = open(path);

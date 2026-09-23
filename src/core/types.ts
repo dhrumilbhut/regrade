@@ -119,6 +119,8 @@ export interface ScoreResult {
   costUsd?: number | null;
   /** Set when the scorer could not evaluate. The attempt becomes "errored", not "failed". */
   error?: string;
+  /** Facts about how the score was produced, stored with it (llmJudge: `judge` and `temperature`). */
+  metadata?: Record<string, unknown>;
 }
 
 export interface ScorerPreflightContext {
@@ -127,6 +129,8 @@ export interface ScorerPreflightContext {
   env: Record<string, string | undefined>;
   /** Aborts live checks when the run is interrupted. */
   signal?: AbortSignal;
+  /** Report a warning to the user (printed with the run). */
+  warn?: (message: string) => void;
   /**
    * Whether preflight may make live calls (e.g. one tiny request to check the judge works).
    * False when the user opted out (`--no-judge-check`). Treat undefined as true.
@@ -207,6 +211,7 @@ export interface ScoreRecord {
   costUsd?: number | null;
   error?: string;
   config?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface AttemptRecord {

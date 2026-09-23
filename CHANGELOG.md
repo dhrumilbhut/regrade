@@ -8,7 +8,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 - **The judge is checked before the run.** One trivial call per judge model before any case runs; a judge that cannot give a valid verdict stops the run with exit 2 and the reason, instead of erroring every attempt. `--no-judge-check` (or `judgeCheck: false` in the library) skips it.
-- Library: a scorer's `preflight` may be async, and receives `signal` and `liveChecks` (additive).
+- **Every judge verdict records which model produced it and at what temperature** (`0`, or `default` for models that reject 0), shown by `regrade show` and the HTML report. A judge that runs at its default temperature triggers a warning, since its verdicts can vary more between runs.
+- Library: a scorer's `preflight` may be async, and receives `signal`, `warn` and `liveChecks`; `ScoreResult.metadata` is stored with the score (all additive). The database schema moves to version 2 (`scores.metadata_json`); existing databases upgrade automatically.
 
 ## [0.3.1]: first npm release
 

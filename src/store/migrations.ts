@@ -68,6 +68,11 @@ CREATE INDEX idx_results_case ON results(case_id, run_id);
 CREATE INDEX idx_scores_res   ON scores(result_id);
 `,
   },
+  {
+    version: 2,
+    description: "scores.metadata_json: how a score was produced (e.g. the judge model and temperature)",
+    sql: `ALTER TABLE scores ADD COLUMN metadata_json TEXT;`,
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = migrations[migrations.length - 1]?.version ?? 0;
