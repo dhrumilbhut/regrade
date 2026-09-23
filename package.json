@@ -25,7 +25,7 @@
   },
   "type": "module",
   "bin": {
-    "regrade": "./dist/cli.js"
+    "regrade": "dist/cli.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

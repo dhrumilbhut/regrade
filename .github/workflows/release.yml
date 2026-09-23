@@ -22,7 +22,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-          registry-url: https://registry.npmjs.org
+          # No registry-url: it writes an _authToken line to .npmrc, and npm then skips the
+          # trusted-publishing (OIDC) credentials and the publish is refused (E404/E403).
           cache: npm
       - run: npm ci
       - run: npm run lint
