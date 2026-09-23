@@ -53,6 +53,7 @@ export function buildProgram(): Command {
     .option("--case <id>", "only run this case id (repeatable)", collect)
     .option("--label <text>", "label this run, e.g. a prompt version")
     .option("--judge <provider:model>", "LLM judge model, e.g. anthropic:claude-sonnet-5")
+    .option("--no-judge-check", "skip the one tiny call that checks the judge works before any case runs")
     .option("--prices <file>", "JSON file with extra/override model prices")
     .option("--no-color", "disable coloured output")
     .addHelpText(

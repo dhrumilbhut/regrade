@@ -153,6 +153,7 @@ Judge scores are useful, but **they are not ground truth**. Studies find raw jud
 
 - The pipeline output is untrusted text. It is fenced inside a per-call random delimiter, and the judge is told everything inside is data, never instructions.
 - The judge must return schema-validated JSON (`{reasoning, verdict}`, reasoning first) using the provider's native structured output, at temperature 0. Models that accept only their default temperature (such as current OpenAI reasoning models) reject that; Regrade then asks again without it, so those judges run at their default temperature.
+- **Checked before the run.** Before any case runs, Regrade asks each judge one trivial question. If the judge cannot answer with a valid verdict (unknown model, bad key, no structured output), the run stops with exit 2 and says why, instead of erroring every attempt. It costs one tiny call per judge; `--no-judge-check` skips it.
 - **Fail closed.** A malformed, refused or failed judge response makes the attempt **errored**, never an implicit pass.
 - Judge spend is recorded separately from pipeline cost.
 - Regrade warns when the judge model is the same as the pipeline model (judges favour their own output).
@@ -309,6 +310,7 @@ regrade run <suite> [options]     Run a suite (.json, or a code suite: .ts .mts 
   --case <id>                     only this case (repeatable)
   --label <text>                  label the run (e.g. a prompt version)
   --judge <provider:model>        LLM judge model
+  --no-judge-check                skip the one tiny call that checks the judge before any case runs
   --prices <file>                 extra/override model prices
   --no-color                      plain output (also honours NO_COLOR; set REGRADE_ASCII=1 for ASCII symbols)
 regrade runs [--suite <name>] [--limit <n>]        List saved runs, newest first

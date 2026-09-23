@@ -40,6 +40,8 @@ export interface RunOverrides {
   label?: string;
   /** Judge model as `provider:model`; beats suite defaults and REGRADE_JUDGE. */
   judge?: string;
+  /** Default true: before any case runs, make one tiny call to each judge to check it works. */
+  judgeCheck?: boolean;
   prices?: PriceEntryInput[];
   /**
    * Gate on the attempt-level pass rate (0..1) instead of requiring every case to pass.
@@ -136,7 +138,9 @@ export async function runSuite(opts: RunOptions): Promise<RunOutcome> {
   const judgeFromEnv = env.REGRADE_JUDGE ? env.REGRADE_JUDGE : undefined;
   const judge = overrides.judge ?? defaults.judge ?? judgeFromEnv;
   const scorerNames = [...new Set(cases.flatMap((c) => c.scorers))];
-  for (const name of scorerNames) registry.getScorer(name).preflight?.({ cases, judge, env });
+  for (const name of scorerNames) {
+    await registry.getScorer(name).preflight?.({ cases, judge, env, signal: opts.signal, liveChecks: overrides.judgeCheck !== false });
+  }
 
   const prices: PriceTable = mergePrices(mergePrices(defaultPrices(), suite.pricing), overrides.prices);
   const label = pipelineLabel(suite.pipeline.adapter, pipelineConfig);

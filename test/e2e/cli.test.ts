@@ -150,6 +150,23 @@ describe("regrade CLI (built binary)", () => {
     expect(c.stdout).toContain("1 case");
   });
 
+  it("a judge that does not work stops the run with exit 2 before any case runs; --no-judge-check skips the check", async () => {
+    stub = await startStubJudge("http400");
+    const cwd = workdir();
+    const env = { PIPELINE_URL: mock.url, ANTHROPIC_API_KEY: "test-key", ANTHROPIC_BASE_URL: stub.anthropicBaseUrl };
+    const suite = join(root, "examples", "qa-http", "suite.json");
+    const r = await runCli(["run", suite], { cwd, env });
+    expect(r.code).toBe(2);
+    expect(r.stderr).toContain("judge anthropic:claude-sonnet-5 does not work");
+    expect(r.stderr).toContain("--no-judge-check");
+    const db = new Database(join(cwd, ".regrade", "results.db"), { readonly: true });
+    expect(db.prepare("SELECT COUNT(*) AS n FROM runs").get()).toEqual({ n: 0 });
+    db.close();
+    const skipped = await runCli(["run", suite, "--no-judge-check"], { cwd, env });
+    expect(skipped.code).toBe(1); // ran; the judged attempts errored
+    expect(skipped.stdout).toContain("errored");
+  });
+
   it("runs the shipped example suite end to end with a judge (stubbed provider)", async () => {
     stub = await startStubJudge();
     const cwd = workdir();
@@ -160,7 +177,7 @@ describe("regrade CLI (built binary)", () => {
     expect(r.stdout).toContain("judge anthropic:claude-sonnet-5");
     expect(r.code).toBe(0);
     expect(r.stdout).toContain("All 2 cases passed.");
-    expect(stub.requests).toHaveLength(2);
+    expect(stub.requests).toHaveLength(3); // the judge check, then one verdict per case
     const report = JSON.parse(readFileSync(join(cwd, "r.json"), "utf8"));
     const judgeScores = report.cases.flatMap((c: { attempts: Array<{ scores: Array<{ scorerName: string; reasoning?: string; costUsd: number }> }> }) =>
       c.attempts.flatMap((a) => a.scores.filter((s) => s.scorerName === "llmJudge")),

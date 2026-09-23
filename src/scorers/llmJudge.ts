@@ -2,7 +2,7 @@ import { z } from "zod";
 import { AdapterError, ConfigError, JudgeError, errorMessage } from "../core/errors.js";
 import { withRetry } from "../core/retry.js";
 import type { Scorer, ScoreResult } from "../core/types.js";
-import { callLlm, parseModelSpec, resolveApiKey, resolveBaseUrl, type LlmResult } from "../llm/client.js";
+import { callLlm, parseModelSpec, resolveApiKey, resolveBaseUrl, type LlmResult, type Provider } from "../llm/client.js";
 import { computeCost } from "../pricing/cost.js";
 import { buildJudgePrompt, DEFAULT_RUBRIC, JUDGE_SCHEMA } from "./judgePrompt.js";
 
@@ -17,6 +17,7 @@ const verdictSchema = z.strictObject({
 });
 
 const JUDGE_MAX_TOKENS = 1024;
+const JUDGE_CHECK_TIMEOUT_MS = 60_000;
 
 /**
  * Judge endpoints (provider, base URL, model) seen rejecting `temperature`: newer reasoning models
@@ -26,6 +27,61 @@ const rejectsTemperature = new Set<string>();
 
 function isTemperatureRejection(err: unknown): boolean {
   return err instanceof AdapterError && err.status === 400 && /temperature/i.test(err.message);
+}
+
+interface JudgeEndpoint {
+  provider: Provider;
+  model: string;
+  apiKey: string;
+  baseUrl: string;
+}
+
+function judgeEndpoint(spec: string, env: Record<string, string | undefined>): JudgeEndpoint {
+  const { provider, model } = parseModelSpec(spec, "judge model");
+  return { provider, model, apiKey: resolveApiKey(provider, env), baseUrl: resolveBaseUrl(provider, env) };
+}
+
+/**
+ * One judge request, with transport retries. Asks for temperature 0 unless the model rejects it.
+ * `temperature` reports what the judge actually ran at.
+ */
+async function askJudge(
+  ep: JudgeEndpoint,
+  prompt: { system: string; user: string },
+  signal: AbortSignal,
+): Promise<{ res: LlmResult; temperature: 0 | "default" }> {
+  const call = async (temperature: number | undefined) =>
+    (
+      await withRetry(
+        () =>
+          callLlm({
+            ...ep,
+            messages: [
+              { role: "system", content: prompt.system },
+              { role: "user", content: prompt.user },
+            ],
+            maxTokens: JUDGE_MAX_TOKENS,
+            temperature,
+            jsonSchema: { name: "verdict", schema: JUDGE_SCHEMA },
+            signal,
+          }),
+        { signal },
+      )
+    ).value;
+  const endpoint = `${ep.provider} ${ep.baseUrl} ${ep.model}`;
+  try {
+    if (rejectsTemperature.has(endpoint)) return { res: await call(undefined), temperature: "default" };
+    try {
+      return { res: await call(0), temperature: 0 };
+    } catch (err) {
+      if (!isTemperatureRejection(err)) throw err;
+      rejectsTemperature.add(endpoint);
+      return { res: await call(undefined), temperature: "default" };
+    }
+  } catch (err) {
+    if (err instanceof AdapterError) throw new JudgeError(`judge call failed: ${err.message}`, { cause: err });
+    throw err;
+  }
 }
 
 /** Accept valid JSON, tolerating a single surrounding ``` fence (some compatible servers add one). */
@@ -47,6 +103,28 @@ function parseVerdict(text: string): z.infer<typeof verdictSchema> {
   return r.data;
 }
 
+/**
+ * Ask the judge one trivial question before any case runs, so a judge that cannot work (unknown
+ * model, bad key, no structured output) stops the run with a clear message instead of erroring
+ * every attempt. Only the shape of the answer is checked, not the verdict.
+ */
+async function checkJudge(spec: string, env: Record<string, string | undefined>, runSignal?: AbortSignal): Promise<void> {
+  const timeout = AbortSignal.timeout(JUDGE_CHECK_TIMEOUT_MS);
+  const signal = runSignal ? AbortSignal.any([runSignal, timeout]) : timeout;
+  try {
+    const prompt = buildJudgePrompt({ rubric: "Is the output the word OK?", input: "Reply with OK.", expected: "OK", output: "OK" });
+    const { res } = await askJudge(judgeEndpoint(spec, env), prompt, signal);
+    if (res.refused) throw new JudgeError("the judge refused a trivial request");
+    parseVerdict(res.text);
+  } catch (err) {
+    throw new ConfigError(
+      `The judge ${spec} does not work: ${errorMessage(err)}. ` +
+        "Fix the judge configuration, or skip this check with --no-judge-check.",
+      { cause: err },
+    );
+  }
+}
+
 function addCost(total: number | null | undefined, add: number | null): number | null {
   if (total === null || add === null) return null;
   return (total ?? 0) + add;
@@ -62,10 +140,11 @@ function addCost(total: number | null | undefined, add: number | null): number |
 export const llmJudge: Scorer = {
   name: "llmJudge",
 
-  preflight({ cases, judge, env }) {
+  async preflight({ cases, judge, env, signal, liveChecks }) {
     const users = cases.filter((c) => c.scorers.includes("llmJudge"));
     if (users.length === 0) return;
     const providers = new Set<string>();
+    const specs = new Set<string>();
     for (const c of users) {
       const cfg = configSchema.safeParse(c.scorerConfig?.llmJudge ?? {});
       if (!cfg.success) {
@@ -83,7 +162,9 @@ export const llmJudge: Scorer = {
         providers.add(provider);
         resolveApiKey(provider, env);
       }
+      specs.add(spec);
     }
+    if (liveChecks !== false) await Promise.all([...specs].map((spec) => checkJudge(spec, env, signal)));
   },
 
   async score({ input, expected, output, config, runtime }) {
@@ -96,9 +177,7 @@ export const llmJudge: Scorer = {
 
     let cost: number | null = 0;
     try {
-      const { provider, model } = parseModelSpec(spec, "judge model");
-      const apiKey = resolveApiKey(provider, runtime.env);
-      const baseUrl = resolveBaseUrl(provider, runtime.env);
+      const ep = judgeEndpoint(spec, runtime.env);
       const prompt = buildJudgePrompt({
         rubric: cfg.data.rubric ?? DEFAULT_RUBRIC,
         input,
@@ -108,46 +187,8 @@ export const llmJudge: Scorer = {
 
       let lastError: unknown;
       for (let attempt = 0; attempt < 2; attempt++) {
-        let res: LlmResult;
-        const call = async (temperature: number | undefined) =>
-          (
-            await withRetry(
-              () =>
-                callLlm({
-                  provider,
-                  model,
-                  apiKey,
-                  baseUrl,
-                  messages: [
-                    { role: "system", content: prompt.system },
-                    { role: "user", content: prompt.user },
-                  ],
-                  maxTokens: JUDGE_MAX_TOKENS,
-                  temperature,
-                  jsonSchema: { name: "verdict", schema: JUDGE_SCHEMA },
-                  signal: runtime.signal,
-                }),
-              { signal: runtime.signal },
-            )
-          ).value;
-        const endpoint = `${provider} ${baseUrl} ${model}`;
-        try {
-          if (rejectsTemperature.has(endpoint)) {
-            res = await call(undefined);
-          } else {
-            try {
-              res = await call(0); // deterministic where the model allows it
-            } catch (err) {
-              if (!isTemperatureRejection(err)) throw err;
-              rejectsTemperature.add(endpoint);
-              res = await call(undefined);
-            }
-          }
-        } catch (err) {
-          if (err instanceof AdapterError) throw new JudgeError(`judge call failed: ${err.message}`, { cause: err });
-          throw err;
-        }
-        cost = addCost(cost, computeCost(runtime.prices, provider, model, res.usage));
+        const { res } = await askJudge(ep, prompt, runtime.signal);
+        cost = addCost(cost, computeCost(runtime.prices, ep.provider, ep.model, res.usage));
 
         if (res.refused) throw new JudgeError("judge refused to evaluate this output");
         try {

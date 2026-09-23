@@ -247,6 +247,19 @@ describe("runSuite: persistence", () => {
     expect(a.plain).toBe(b.plain);
   });
 
+  it("a judge that fails its check stops the run before anything is sent or saved", async () => {
+    const { mock } = await setup();
+    stub = await startStubJudge("http400");
+    const env = { OPENAI_API_KEY: "k", OPENAI_BASE_URL: stub.openaiBaseUrl };
+    const suite = httpSuite(mock.url, [exact("judged", "What is 2 + 2?", "4", { scorers: ["llmJudge"] })]);
+    await expect(run(suite, { env }, { judge: "openai:gpt-test" })).rejects.toThrow(/judge openai:gpt-test does not work/);
+    expect(mock.requests).toHaveLength(0);
+    expect(store!.listRuns()).toHaveLength(0);
+    // opting out skips the check; the attempt then errors instead
+    const out = await run(suite, { env }, { judge: "openai:gpt-test", judgeCheck: false });
+    expect(out.cases[0]?.verdict).toBe("errored");
+  });
+
   it("stores label and git info", async () => {
     const { mock } = await setup();
     const out = await run(httpSuite(mock.url, [exact("c", "What is 2 + 2?", "4")]), { git: { sha: "deadbeef", dirty: false } }, { label: "prompt-v7" });
@@ -314,7 +327,8 @@ describe("runSuite: preflight and filters", () => {
     await run(suite, { env });
     await run(suite, { env }, { judge: "anthropic:from-cli" });
     await run({ ...suite, defaults: {} }, { env });
-    expect(stub.requests.map((r) => r.body.model)).toEqual(["from-suite", "from-cli", "from-env"]);
+    // each run: the judge check, then the verdict
+    expect(stub.requests.map((r) => r.body.model)).toEqual(["from-suite", "from-suite", "from-cli", "from-cli", "from-env", "from-env"]);
   });
 
   it("scores with llmJudge end to end and separates judge cost from pipeline cost", async () => {
@@ -343,7 +357,7 @@ describe("runSuite: preflight and filters", () => {
     await stub.close();
     stub = await startStubJudge("freetext");
     const env2 = { ANTHROPIC_API_KEY: "k", ANTHROPIC_BASE_URL: stub.anthropicBaseUrl };
-    const broken = await run(suite, { env: env2 });
+    const broken = await run(suite, { env: env2 }, { judgeCheck: false }); // broken mid-run, past the check
     expect(broken.cases[0]?.verdict).toBe("errored");
     expect(broken.exitCode).toBe(1);
   });

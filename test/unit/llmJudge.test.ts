@@ -230,14 +230,67 @@ describe("llmJudge cost and preflight", () => {
 
   const cases = (over: Partial<TestCase> = {}): TestCase[] => [{ id: "a", input: "x", scorers: ["llmJudge"], ...over }];
 
-  it("preflight fails fast without a judge or without the API key", () => {
-    expect(() => llmJudge.preflight!({ cases: cases(), env: {} })).toThrow(/no judge model is configured/);
-    expect(() => llmJudge.preflight!({ cases: cases(), judge: "anthropic:m", env: {} })).toThrow(/ANTHROPIC_API_KEY/);
-    expect(() => llmJudge.preflight!({ cases: cases(), judge: "bogus", env: {} })).toThrow(ConfigError);
+  it("preflight fails fast without a judge or without the API key", async () => {
+    await expect(llmJudge.preflight!({ cases: cases(), env: {} })).rejects.toThrow(/no judge model is configured/);
+    await expect(llmJudge.preflight!({ cases: cases(), judge: "anthropic:m", env: {} })).rejects.toThrow(/ANTHROPIC_API_KEY/);
+    await expect(llmJudge.preflight!({ cases: cases(), judge: "bogus", env: {} })).rejects.toThrow(ConfigError);
   });
 
-  it("preflight is silent when the judge is configured, and ignores suites that do not use it", () => {
-    expect(() => llmJudge.preflight!({ cases: cases(), judge: "anthropic:m", env: { ANTHROPIC_API_KEY: "k" } })).not.toThrow();
-    expect(() => llmJudge.preflight!({ cases: cases({ scorers: ["exactMatch"] }), env: {} })).not.toThrow();
+  it("preflight is silent when the judge is configured, and ignores suites that do not use it", async () => {
+    await expect(
+      llmJudge.preflight!({ cases: cases(), judge: "anthropic:m", env: { ANTHROPIC_API_KEY: "k" }, liveChecks: false }),
+    ).resolves.toBeUndefined();
+    await expect(llmJudge.preflight!({ cases: cases({ scorers: ["exactMatch"] }), env: {} })).resolves.toBeUndefined();
+  });
+});
+
+describe("llmJudge check before the run", () => {
+  const judged = (id: string, judge?: string): TestCase => ({
+    id,
+    input: "x",
+    scorers: ["llmJudge"],
+    ...(judge ? { scorerConfig: { llmJudge: { judge } } } : {}),
+  });
+
+  it("asks each distinct judge one question, with a fenced placeholder output", async () => {
+    stub = await startStubJudge();
+    await llmJudge.preflight!({
+      cases: [judged("a"), judged("b"), judged("c", "anthropic:claude-haiku-4-5")],
+      judge: "anthropic:claude-sonnet-5",
+      env: anthropicEnv(),
+    });
+    expect(stub.requests.map((r) => r.body.model).sort()).toEqual(["claude-haiku-4-5", "claude-sonnet-5"]);
+    expect(extractOutputBlock(stub.requests[0]!.prompt)).toBe("OK");
+  });
+
+  it("makes no call when live checks are off", async () => {
+    stub = await startStubJudge();
+    await llmJudge.preflight!({ cases: [judged("a")], judge: "anthropic:claude-sonnet-5", env: anthropicEnv(), liveChecks: false });
+    expect(stub.requests).toHaveLength(0);
+  });
+
+  it.each([
+    ["http400", /HTTP 400/],
+    ["freetext", /did not return JSON/],
+    ["refusal", /refused/],
+  ] as const)("a judge that cannot give a verdict stops the run, saying why (%s)", async (mode, why) => {
+    stub = await startStubJudge(mode);
+    const check = llmJudge.preflight!({ cases: [judged("a")], judge: "openai:gpt-test", env: openaiEnv() });
+    await expect(check).rejects.toThrow(ConfigError);
+    await expect(check).rejects.toThrow(/judge openai:gpt-test does not work.*--no-judge-check/s);
+    await expect(check).rejects.toThrow(why);
+  });
+
+  it("does not care which verdict the check gets, only that it is a valid one", async () => {
+    stub = await startStubJudge("normal", () => "fail");
+    await expect(llmJudge.preflight!({ cases: [judged("a")], judge: "openai:gpt-test", env: openaiEnv() })).resolves.toBeUndefined();
+  });
+
+  it("passes for a model that rejects temperature, and later verdicts skip the rejected try", async () => {
+    stub = await startStubJudge("notemperature");
+    const judge = "openai:gpt-reasoning-check";
+    await llmJudge.preflight!({ cases: [judged("a")], judge, env: openaiEnv() });
+    await llmJudge.score(scoreArgs({ runtime: runtime(openaiEnv(), judge) }));
+    expect(stub.requests.map((r) => r.body.temperature)).toEqual([0, undefined, undefined]);
   });
 });

@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- **The judge is checked before the run.** One trivial call per judge model before any case runs; a judge that cannot give a valid verdict stops the run with exit 2 and the reason, instead of erroring every attempt. `--no-judge-check` (or `judgeCheck: false` in the library) skips it.
+- Library: a scorer's `preflight` may be async, and receives `signal` and `liveChecks` (additive).
+
 ## [0.3.1]: first npm release
 
 Fixes found by the first test against the real OpenAI API.

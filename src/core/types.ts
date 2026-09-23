@@ -125,6 +125,13 @@ export interface ScorerPreflightContext {
   cases: ReadonlyArray<TestCase>;
   judge?: string;
   env: Record<string, string | undefined>;
+  /** Aborts live checks when the run is interrupted. */
+  signal?: AbortSignal;
+  /**
+   * Whether preflight may make live calls (e.g. one tiny request to check the judge works).
+   * False when the user opted out (`--no-judge-check`). Treat undefined as true.
+   */
+  liveChecks?: boolean;
 }
 
 export interface Scorer {
@@ -138,8 +145,8 @@ export interface Scorer {
    */
   fingerprint?: string;
   score(args: ScoreArgs): Promise<ScoreResult>;
-  /** Optional fail-fast validation before any case runs. Throws `ConfigError`. */
-  preflight?(ctx: ScorerPreflightContext): void;
+  /** Optional fail-fast validation before any case runs (may be async). Throws `ConfigError`. */
+  preflight?(ctx: ScorerPreflightContext): void | Promise<void>;
 }
 
 // ---- Suite ------------------------------------------------------------------
