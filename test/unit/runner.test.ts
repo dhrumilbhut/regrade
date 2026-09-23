@@ -222,6 +222,31 @@ describe("runSuite: persistence", () => {
     expect(a.run.suiteHash).toBe(c.run.suiteHash);
   });
 
+  it("folds the run's judge into the hash of cases that use llmJudge, and only those", async () => {
+    const { mock } = await setup();
+    stub = await startStubJudge();
+    const env = { ANTHROPIC_API_KEY: "k", ANTHROPIC_BASE_URL: stub.anthropicBaseUrl };
+    const suite = httpSuite(mock.url, [
+      exact("judged", "What is 2 + 2?", "4", { scorers: ["llmJudge"] }),
+      exact("pinned", "What is 2 + 2?", "4", {
+        scorers: ["llmJudge"],
+        scorerConfig: { llmJudge: { judge: "anthropic:claude-haiku-4-5" } },
+      }),
+      exact("plain", "What is 2 + 2?", "4"),
+    ]);
+    const hashes = async (judge: string) => {
+      const out = await run(suite, { env }, { judge });
+      return Object.fromEntries(store!.getAttempts(out.run.runId).map((a) => [a.caseId, a.caseHash]));
+    };
+    const a = await hashes("anthropic:claude-sonnet-5");
+    const b = await hashes("anthropic:claude-opus-5");
+    const c = await hashes("anthropic:claude-sonnet-5");
+    expect(a.judged).not.toBe(b.judged);
+    expect(a.judged).toBe(c.judged);
+    expect(a.pinned).toBe(b.pinned); // its own judge is in scorerConfig, so the run's judge is irrelevant
+    expect(a.plain).toBe(b.plain);
+  });
+
   it("stores label and git info", async () => {
     const { mock } = await setup();
     const out = await run(httpSuite(mock.url, [exact("c", "What is 2 + 2?", "4")]), { git: { sha: "deadbeef", dirty: false } }, { label: "prompt-v7" });

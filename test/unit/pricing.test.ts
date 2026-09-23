@@ -59,6 +59,14 @@ describe("OpenAI prices (from the owner's pricing-page screenshot, short-context
     ["gpt-6-astra", 10, 1, 12.5, 50],
     ["gpt-5.6-terra", 2, 0.2, 2.5, 12],
     ["gpt-5.6-luna", 0.2, 0.02, 0.25, 1.2],
+    ["gpt-6-sol", 2, 0.2, 2.5, 10],
+    ["gpt-6-luna", 0.1, 0.01, 0.125, 0.5],
+    // models whose page shows no cache-write price ("-")
+    ["gpt-5.4-nano", 0.2, 0.02, undefined, 1.25],
+    ["gpt-5-nano", 0.05, 0.005, undefined, 0.4],
+    ["gpt-4.1-nano", 0.1, 0.025, undefined, 0.4],
+    ["gpt-4o-mini", 0.15, 0.075, undefined, 0.6],
+    ["gpt-5.5-pro", 30, undefined, undefined, 180],
   ])("%s: input %d, cached %d, cache write %d, output %d per million", (model, input, cached, write, output) => {
     const p = findPrice(table, "openai", model)!;
     expect([p.inputPerMTok, p.cachedInputPerMTok, p.cacheWrite5mPerMTok, p.outputPerMTok]).toEqual([input, cached, write, output]);

@@ -18,6 +18,16 @@ const verdictSchema = z.strictObject({
 
 const JUDGE_MAX_TOKENS = 1024;
 
+/**
+ * Judge endpoints (provider, base URL, model) seen rejecting `temperature`: newer reasoning models
+ * accept only their default. They are asked again without it, and later calls skip the rejected try.
+ */
+const rejectsTemperature = new Set<string>();
+
+function isTemperatureRejection(err: unknown): boolean {
+  return err instanceof AdapterError && err.status === 400 && /temperature/i.test(err.message);
+}
+
 /** Accept valid JSON, tolerating a single surrounding ``` fence (some compatible servers add one). */
 function parseVerdict(text: string): z.infer<typeof verdictSchema> {
   let t = text.trim();
@@ -46,7 +56,8 @@ function addCost(total: number | null | undefined, add: number | null): number |
  * LLM-as-judge. The pipeline output is untrusted text, so it is fenced with a
  * per-call random token, the judge is told to treat it as data, native
  * structured output is requested, and anything that is not a valid verdict
- * fails closed (an error, never an implicit pass).
+ * fails closed (an error, never an implicit pass). Temperature 0 is requested, except from models
+ * that reject it, which are judged at their default temperature.
  */
 export const llmJudge: Scorer = {
   name: "llmJudge",
@@ -98,25 +109,40 @@ export const llmJudge: Scorer = {
       let lastError: unknown;
       for (let attempt = 0; attempt < 2; attempt++) {
         let res: LlmResult;
+        const call = async (temperature: number | undefined) =>
+          (
+            await withRetry(
+              () =>
+                callLlm({
+                  provider,
+                  model,
+                  apiKey,
+                  baseUrl,
+                  messages: [
+                    { role: "system", content: prompt.system },
+                    { role: "user", content: prompt.user },
+                  ],
+                  maxTokens: JUDGE_MAX_TOKENS,
+                  temperature,
+                  jsonSchema: { name: "verdict", schema: JUDGE_SCHEMA },
+                  signal: runtime.signal,
+                }),
+              { signal: runtime.signal },
+            )
+          ).value;
+        const endpoint = `${provider} ${baseUrl} ${model}`;
         try {
-          ({ value: res } = await withRetry(
-            () =>
-              callLlm({
-                provider,
-                model,
-                apiKey,
-                baseUrl,
-                messages: [
-                  { role: "system", content: prompt.system },
-                  { role: "user", content: prompt.user },
-                ],
-                maxTokens: JUDGE_MAX_TOKENS,
-                temperature: 0,
-                jsonSchema: { name: "verdict", schema: JUDGE_SCHEMA },
-                signal: runtime.signal,
-              }),
-            { signal: runtime.signal },
-          ));
+          if (rejectsTemperature.has(endpoint)) {
+            res = await call(undefined);
+          } else {
+            try {
+              res = await call(0); // deterministic where the model allows it
+            } catch (err) {
+              if (!isTemperatureRejection(err)) throw err;
+              rejectsTemperature.add(endpoint);
+              res = await call(undefined);
+            }
+          }
         } catch (err) {
           if (err instanceof AdapterError) throw new JudgeError(`judge call failed: ${err.message}`, { cause: err });
           throw err;

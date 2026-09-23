@@ -17,6 +17,8 @@ export interface StubReply {
   refusal?: boolean;
   /** Respond with this HTTP error instead. */
   status?: number;
+  /** Error message for `status` (default "stub error <status>"). */
+  errorMessage?: string;
   usage?: StubUsage;
 }
 
@@ -84,7 +86,7 @@ export async function startStubLlm(reply: (req: StubRequest) => StubReply): Prom
       const r = reply(stubReq);
       if (r.status) {
         res.writeHead(r.status, { "content-type": "application/json" });
-        res.end(JSON.stringify({ error: { message: `stub error ${r.status}` } }));
+        res.end(JSON.stringify({ error: { message: r.errorMessage ?? `stub error ${r.status}` } }));
         return;
       }
       const u = r.usage ?? { input: 100, output: 20 };
@@ -150,17 +152,25 @@ export async function startStubLlm(reply: (req: StubRequest) => StubReply): Prom
   };
 }
 
-export type JudgeMode = "normal" | "freetext" | "refusal" | "badschema" | "http500" | "fenced";
+export type JudgeMode = "normal" | "freetext" | "refusal" | "badschema" | "http500" | "http400" | "fenced" | "notemperature";
 
 /**
  * Judge stub: passes unless the OUTPUT block contains "WRONG". Modes simulate a
- * misbehaving judge: free text, refusal, schema-violating JSON, HTTP 500, or
- * valid JSON wrapped in a ``` fence.
+ * misbehaving judge: free text, refusal, schema-violating JSON, HTTP 500 or 400, or
+ * valid JSON wrapped in a ``` fence. "notemperature" answers normally but, like newer
+ * reasoning models, rejects any request that sets `temperature` with a 400.
  */
 export function startStubJudge(mode: JudgeMode = "normal", verdictOf?: (output: string) => "pass" | "fail"): Promise<StubLlm> {
   const decide = verdictOf ?? ((o: string) => (o.includes("WRONG") ? "fail" : "pass"));
   return startStubLlm((req) => {
     if (mode === "http500") return { status: 500 };
+    if (mode === "http400") return { status: 400, errorMessage: "Invalid value for 'max_completion_tokens'." };
+    if (mode === "notemperature" && req.body.temperature !== undefined) {
+      return {
+        status: 400,
+        errorMessage: "Unsupported value: 'temperature' does not support 0 with this model. Only the default (1) value is supported.",
+      };
+    }
     if (mode === "refusal") return { refusal: true };
     if (mode === "freetext") return { text: "Looks good to me, PASS!" };
     if (mode === "badschema") return { text: JSON.stringify({ verdict: "maybe", reasoning: 3 }) };

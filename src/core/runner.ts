@@ -267,6 +267,9 @@ export async function runSuite(opts: RunOptions): Promise<RunOutcome> {
     }
 
     const fingerprints = testCase.scorers.map((n) => registry.getScorer(n).fingerprint ?? null);
+    // A different judge is a different measuring stick; a per-case judge is already in scorerConfig.
+    const runJudge =
+      testCase.scorers.includes("llmJudge") && testCase.scorerConfig?.llmJudge?.judge === undefined ? judge : undefined;
     let status: AttemptStatus;
     if (error !== undefined || scores.some((s) => s.error)) status = "errored";
     else if (scores.some((s) => !s.pass)) status = "failed";
@@ -282,6 +285,7 @@ export async function runSuite(opts: RunOptions): Promise<RunOutcome> {
         scorerConfig: testCase.scorerConfig ?? null,
         // only present when some scorer has a fingerprint, so hashes of built-in-only suites are unchanged
         ...(fingerprints.some((f) => f !== null) ? { scorerFingerprints: fingerprints } : {}),
+        ...(runJudge ? { judge: runJudge } : {}),
       }),
       input: testCase.input,
       expected: testCase.expected,

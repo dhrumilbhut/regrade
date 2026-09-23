@@ -66,6 +66,28 @@ describe("llmJudge verdicts", () => {
   });
 });
 
+describe("llmJudge temperature", () => {
+  it("asks for temperature 0", async () => {
+    stub = await startStubJudge();
+    await llmJudge.score(scoreArgs({ runtime: runtime(anthropicEnv()) }));
+    expect(stub.requests[0]?.body.temperature).toBe(0);
+  });
+
+  it.each([
+    ["openai", "openai:gpt-reasoning", openaiEnv],
+    ["anthropic", "anthropic:claude-reasoning", anthropicEnv],
+  ] as const)("judges a model that rejects temperature at its default, and remembers that (%s)", async (_p, judge, env) => {
+    stub = await startStubJudge("notemperature");
+    const ok = await llmJudge.score(scoreArgs({ output: "Paris", runtime: runtime(env(), judge) }));
+    expect(ok).toMatchObject({ pass: true, value: 1 });
+    expect(ok.error).toBeUndefined();
+    const bad = await llmJudge.score(scoreArgs({ output: "WRONG", runtime: runtime(env(), judge) }));
+    expect(bad).toMatchObject({ pass: false, value: 0 });
+    // rejected once, retried without temperature; the second verdict goes straight to the default
+    expect(stub.requests.map((r) => r.body.temperature)).toEqual([0, undefined, undefined]);
+  });
+});
+
 describe("llmJudge fails closed", () => {
   it("treats free text as an error, never a pass (even if it says PASS)", async () => {
     stub = await startStubJudge("freetext");
@@ -101,6 +123,13 @@ describe("llmJudge fails closed", () => {
     expect(r.error).toContain("judge call failed");
     expect(r.error).toContain("500");
   }, 15_000);
+
+  it("does not retry without temperature on an unrelated 400", async () => {
+    stub = await startStubJudge("http400");
+    const r = await llmJudge.score(scoreArgs({ runtime: runtime(openaiEnv(), "openai:gpt-test") }));
+    expect(r.error).toContain("400");
+    expect(stub.requests).toHaveLength(1);
+  });
 
   it("errors when no judge model is configured or the spec is malformed", async () => {
     expect((await llmJudge.score(scoreArgs({ runtime: { ...runtime({}), judge: undefined } }))).error).toContain("no judge model");

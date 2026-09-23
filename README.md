@@ -13,18 +13,17 @@ Regrade runs a suite of test cases through your real pipeline, scores every outp
 - **Honest scoring.** Exact match, an LLM judge hardened against prompt injection, and latency/cost thresholds. Cost accounting prices cache tokens and says "unknown" rather than guessing.
 - **Zero infrastructure.** One CLI, results in one SQLite file, suites are plain JSON you can commit.
 
-> **Status: v0.3.0.** Run, score, persist and repeat; `compare`, `runs`, `show` and single-file HTML/Markdown reports; and **code suites** (TypeScript or JavaScript, with inline scorers and in-process pipelines). Next: trace capture, RAG scorers, judge calibration and a local dashboard.
+> **Status: v0.3.1.** Run, score, persist and repeat; `compare`, `runs`, `show` and single-file HTML/Markdown reports; and **code suites** (TypeScript or JavaScript, with inline scorers and in-process pipelines). Next: trace capture, RAG scorers, judge calibration and a local dashboard.
 
 ## Install
 
 Requires **Node.js 24 or newer** (the current LTS).
 
 ```bash
-# once published to npm
 npx regrade --help
 npm install --global regrade
 
-# from source (today)
+# or from source
 git clone https://github.com/dhrumilbhut/regrade.git && cd regrade
 npm ci && npm run build && npm link
 ```
@@ -40,7 +39,7 @@ regrade run regrade/suite.json
 Prefer code? `regrade init --ts && regrade run regrade/suite.mts` scaffolds a [TypeScript suite](#code-suites-typescript-or-javascript) that needs no server at all.
 
 ```
-regrade 0.1.0 · my-first-suite · http → localhost:4000/pipeline
+regrade 0.3.1 · my-first-suite · http → localhost:4000/pipeline
   2 cases · concurrency 4
 
   ✓ capital-of-france     177 ms  exactMatch ✓  latencyCost ✓
@@ -153,10 +152,13 @@ Both LLM adapters accept `apiKeyEnv` (to name a different env var), `inputTempla
 Judge scores are useful, but **they are not ground truth**. Studies find raw judge agreement overstates real accuracy, and judges can be talked into passing bad answers. Regrade takes these precautions:
 
 - The pipeline output is untrusted text. It is fenced inside a per-call random delimiter, and the judge is told everything inside is data, never instructions.
-- The judge must return schema-validated JSON (`{reasoning, verdict}`, reasoning first) using the provider's native structured output, at temperature 0.
+- The judge must return schema-validated JSON (`{reasoning, verdict}`, reasoning first) using the provider's native structured output, at temperature 0. Models that accept only their default temperature (such as current OpenAI reasoning models) reject that; Regrade then asks again without it, so those judges run at their default temperature.
 - **Fail closed.** A malformed, refused or failed judge response makes the attempt **errored**, never an implicit pass.
 - Judge spend is recorded separately from pipeline cost.
 - Regrade warns when the judge model is the same as the pipeline model (judges favour their own output).
+- **Changing the judge is a change, not a regression.** The judge model is part of each judged case's identity, so `regrade compare` reports those cases as `modified` when two runs used different judges.
+
+Choose a judge by measured cost, not list price: reasoning models can spend hundreds of hidden tokens on one verdict. In a small test (2026-09-23), `gpt-5-nano` (the lowest list price) used 400 to 900 output tokens per verdict and cost about ten times more than `gpt-4.1-nano` or `gpt-6-luna`, which used about 40.
 
 It is still a single LLM making a judgment. Use an exact or programmatic check where you can, and treat judge results as one signal. Judge calibration against human labels is planned for Phase 2.
 
@@ -243,7 +245,7 @@ regrade compare · support-bot
 
 - **Per case** it compares pass rates with Wilson 95% intervals, and runs Fisher's exact test. A change is *significant* only when p < 0.05. That takes several attempts per case: with 3 attempts per side even 3/3 → 0/3 is p = 0.1. Changes on a single attempt are still listed, flagged "could be noise, re-run with `--repeat`".
 - **Overall** it runs a paired permutation test, stratified by case, on the mean change in pass rate, with a within-case bootstrap for the interval. The question a gate asks is "on *this* suite, did the pass rate move by more than the pipeline's sampling noise?", so the randomness that matters is *within* each case, not which cases happen to exist. With one attempt per case this reduces to an exact sign test on the cases that flipped: six one-way flips are significant (p = 0.031), five are not (p = 0.063).
-- **Never compared:** a case whose definition changed between the runs (`modified`), a case in only one run (`new` / `removed`), and a case with an errored attempt (`errored`: no verdict). They are listed, never counted as regressions.
+- **Never compared:** a case whose definition changed between the runs (`modified`, which includes a different judge model for judged cases), a case in only one run (`new` / `removed`), and a case with an errored attempt (`errored`: no verdict). They are listed, never counted as regressions.
 
 `--fail-on-regression` fails on any regressed case (significant or not, because single-attempt suites can't do better), on any case that errored in the head run, and on a significant overall drop. `--significant-only` ignores regressions that aren't statistically significant. The tests check the statistics against textbook reference values and, by simulation, that the overall test rejects under 9% of the time when nothing changed and over 95% of the time for a real drop.
 
@@ -278,7 +280,7 @@ regrade run suite.json --json report.json --repeat 3 --tag smoke --label prompt-
 
 Cost is computed from the provider's reported token usage, priced **per category**: regular input, cache reads, cache writes (5-minute and 1-hour), and output. If a model has no known price, or usage is missing, the cost is **unknown** (shown as such), never guessed.
 
-Prices ship in `src/pricing/prices.json` (dated 2026-09-21): current Anthropic models, and OpenAI's `gpt-6-astra`, `gpt-5.6-sol`, `gpt-5.6-terra` and `gpt-5.6-luna`. Things to know:
+Prices ship in `src/pricing/prices.json` (dated 2026-09-23): current Anthropic models, and OpenAI's GPT-6, GPT-5.x, GPT-4.1, GPT-4o and o4-mini families. Where OpenAI shows no cache-read or cache-write price for a model, a call that uses one has unknown cost. Things to know:
 
 - **Short-context prices only.** OpenAI also charges higher per-token prices above a context-size threshold; that tier is *not* modelled, so requests in it are under-priced. Supply an override if you use it.
 - **Promotions expire.** `gpt-5.6-sol` is priced at its promotional rate through 2026-11-21 and at the standard rate afterwards (`validUntil` on the entry). If a promotion is extended, Regrade will over-report cost until you override it.

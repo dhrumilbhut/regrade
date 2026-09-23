@@ -1,6 +1,6 @@
 {
   "name": "regrade",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Regression tests for AI agents and RAG pipelines. Git diff for AI behavior.",
   "keywords": [
     "llm",

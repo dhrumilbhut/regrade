@@ -158,6 +158,172 @@
       "cachedInputPerMTok": 0.02,
       "cacheWrite5mPerMTok": 0.25,
       "sourceUrl": "https://openai.com/api/pricing (screenshot supplied by the project owner, 2026-09-21)"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-6-sol",
+      "inputPerMTok": 2,
+      "outputPerMTok": 10,
+      "cachedInputPerMTok": 0.2,
+      "cacheWrite5mPerMTok": 2.5,
+      "sourceUrl": "https://openai.com/api/pricing (screenshot supplied by the project owner, 2026-09-23)"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-6-luna",
+      "inputPerMTok": 0.1,
+      "outputPerMTok": 0.5,
+      "cachedInputPerMTok": 0.01,
+      "cacheWrite5mPerMTok": 0.125,
+      "sourceUrl": "https://openai.com/api/pricing (screenshot supplied by the project owner, 2026-09-23)"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.5",
+      "inputPerMTok": 5,
+      "outputPerMTok": 30,
+      "cachedInputPerMTok": 0.5,
+      "sourceUrl": "https://openai.com/api/pricing (screenshot supplied by the project owner, 2026-09-23)"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.5-pro",
+      "inputPerMTok": 30,
+      "outputPerMTok": 180,
+      "sourceUrl": "https://openai.com/api/pricing (screenshot supplied by the project owner, 2026-09-23)"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "inputPerMTok": 2.5,
+      "outputPerMTok": 15,
+      "cachedInputPerMTok": 0.25,
+      "sourceUrl": "https://openai.com/api/pricing (screenshot supplied by the project owner, 2026-09-23)"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.4-pro",
+      "inputPerMTok": 30,
+      "outputPerMTok": 180,
+      "sourceUrl": "https://openai.com/api/pricing (screenshot supplied by the project owner, 2026-09-23)"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.4-mini",
+      "inputPerMTok": 0.75,
+      "outputPerMTok": 4.5,
+      "cachedInputPerMTok": 0.075,
+      "sourceUrl": "https://openai.com/api/pricing (screenshot supplied by the project owner, 2026-09-23)"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.4-nano",
+      "inputPerMTok": 0.2,
+      "outputPerMTok": 1.25,
+      "cachedInputPerMTok": 0.02,
+      "sourceUrl": "https://openai.com/api/pricing (screenshot supplied by the project owner, 2026-09-23)"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.2",
+      "inputPerMTok": 1.75,
+      "outputPerMTok": 14,
+      "cachedInputPerMTok": 0.175,
+      "sourceUrl": "https://openai.com/api/pricing (screenshot supplied by the project owner, 2026-09-23)"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.2-pro",
+      "inputPerMTok": 21,
+      "outputPerMTok": 168,
+      "sourceUrl": "https://openai.com/api/pricing (screenshot supplied by the project owner, 2026-09-23)"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.1",
+      "inputPerMTok": 1.25,
+      "outputPerMTok": 10,
+      "cachedInputPerMTok": 0.125,
+      "sourceUrl": "https://openai.com/api/pricing (screenshot supplied by the project owner, 2026-09-23)"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5",
+      "inputPerMTok": 1.25,
+      "outputPerMTok": 10,
+      "cachedInputPerMTok": 0.125,
+      "sourceUrl": "https://openai.com/api/pricing (screenshot supplied by the project owner, 2026-09-23)"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5-mini",
+      "inputPerMTok": 0.25,
+      "outputPerMTok": 2,
+      "cachedInputPerMTok": 0.025,
+      "sourceUrl": "https://openai.com/api/pricing (screenshot supplied by the project owner, 2026-09-23)"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5-nano",
+      "inputPerMTok": 0.05,
+      "outputPerMTok": 0.4,
+      "cachedInputPerMTok": 0.005,
+      "sourceUrl": "https://openai.com/api/pricing (screenshot supplied by the project owner, 2026-09-23)"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5-pro",
+      "inputPerMTok": 15,
+      "outputPerMTok": 120,
+      "sourceUrl": "https://openai.com/api/pricing (screenshot supplied by the project owner, 2026-09-23)"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-4.1",
+      "inputPerMTok": 2,
+      "outputPerMTok": 8,
+      "cachedInputPerMTok": 0.5,
+      "sourceUrl": "https://openai.com/api/pricing (screenshot supplied by the project owner, 2026-09-23)"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-4.1-mini",
+      "inputPerMTok": 0.4,
+      "outputPerMTok": 1.6,
+      "cachedInputPerMTok": 0.1,
+      "sourceUrl": "https://openai.com/api/pricing (screenshot supplied by the project owner, 2026-09-23)"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-4.1-nano",
+      "inputPerMTok": 0.1,
+      "outputPerMTok": 0.4,
+      "cachedInputPerMTok": 0.025,
+      "sourceUrl": "https://openai.com/api/pricing (screenshot supplied by the project owner, 2026-09-23)"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-4o",
+      "inputPerMTok": 2.5,
+      "outputPerMTok": 10,
+      "cachedInputPerMTok": 1.25,
+      "sourceUrl": "https://openai.com/api/pricing (screenshot supplied by the project owner, 2026-09-23)"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-4o-mini",
+      "inputPerMTok": 0.15,
+      "outputPerMTok": 0.6,
+      "cachedInputPerMTok": 0.075,
+      "sourceUrl": "https://openai.com/api/pricing (screenshot supplied by the project owner, 2026-09-23)"
+    },
+    {
+      "provider": "openai",
+      "model": "o4-mini",
+      "inputPerMTok": 1.1,
+      "outputPerMTok": 4.4,
+      "cachedInputPerMTok": 0.275,
+      "sourceUrl": "https://openai.com/api/pricing (screenshot supplied by the project owner, 2026-09-23)"
     }
   ]
 }

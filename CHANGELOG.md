@@ -6,7 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.1]: first npm release
+
+Fixes found by the first test against the real OpenAI API.
+
+### Fixed
+- **The LLM judge failed with many current OpenAI models** (for example `gpt-6-luna`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5-nano`): it always sent `temperature: 0`, which those models reject with HTTP 400. The judge still asks for temperature 0, and when a model rejects the parameter it asks again without it (for either provider) and skips the rejected attempt for the rest of the run. Other errors still fail closed.
+
 ### Changed
+- **The judge model is now part of a judged case's identity**, so `regrade compare` reports cases judged by different models as `modified` instead of comparing verdicts from different judges. As a one-time effect, cases that use `llmJudge` will show as `modified` when compared with runs made by 0.3.0.
+- OpenAI prices added for the GPT-6 (Sol, Luna), GPT-5.5, 5.4, 5.2, 5.1 and 5, GPT-4.1, GPT-4o and o4-mini families. Where the pricing page shows no cache-read or cache-write price, a call that uses one has unknown cost.
 - **Node.js 24 is now the supported (and CI-tested) version**, down from a "22.14 or newer" claim that was never tested in CI. Support for Node 22 may return later; simple and honest for now.
 
 ## [0.3.0]: code suites
