@@ -1,6 +1,6 @@
 {
   "name": "regrade",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Regression testing for LLM apps, AI agents and RAG pipelines: run test cases through your pipeline, score answers (exact match, LLM-as-a-judge, latency, cost, tool calls), and fail CI when a prompt or model change makes results worse. Statistically honest, vendor-neutral, no infrastructure.",
   "keywords": [
     "llm",

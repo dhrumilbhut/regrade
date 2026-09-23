@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.1]: documentation
+
+No code changes: a rewritten README (which is what npm shows), a documentation website, and llms.txt.
+
 ### Changed
 - **README rewritten** for people and for LLMs: a one-paragraph definition, when to use Regrade, three quickstarts (no key; an OpenAI/Anthropic prompt; your own HTTP service), task-oriented how-to guides, a glossary, an FAQ and rules for AI coding assistants. The reference sections are kept.
 - **Documentation website** generated from the README (`npm run site`, `scripts/site.mts`): a landing page, one page per how-to guide and reference topic, FAQ structured data, `sitemap.xml`, `robots.txt`, `llms.txt` and `llms-full.txt` (llmstxt.org). The sample report moves to `/sample/`. npm description and keywords broadened.
