@@ -4,7 +4,7 @@
 
 **Regrade is an open-source command-line tool and Node.js library for regression testing LLM applications.** It runs a suite of test cases through your real pipeline (an HTTP endpoint, an OpenAI-compatible or Anthropic model, or a TypeScript function), scores every answer with exact match, an LLM judge, latency and cost limits, or checks on the agent's tool calls, saves each run, and fails your CI build when a prompt, model or code change makes results worse. Because LLM output is random, it repeats cases and uses statistical tests to tell a real regression from noise.
 
-**[See a live sample report →](https://dhrumilbhut.github.io/regrade/)** (a healthy pipeline compared with a degraded one: which cases regressed, and is it real or noise?)
+**[See a live sample report →](https://dhrumilbhut.github.io/regrade/sample/)** (a healthy pipeline compared with a degraded one: which cases regressed, and is it real or noise?)
 
 | | |
 |---|---|
@@ -569,7 +569,7 @@ jobs:
 
 ## Reports
 
-A [live example](https://dhrumilbhut.github.io/regrade/) is published from the deterministic sample (`npm run sample-report`).
+A [live example](https://dhrumilbhut.github.io/regrade/sample/) is published from the deterministic sample (`npm run sample-report`).
 
 - **HTML:** `regrade report <run> [--against <base>] --out report.html` writes one self-contained file: no network access, no external assets, opens from `file://`, light and dark themes, filter and search, and per-case drill-down with inputs, outputs, scores, judge reasoning and traces. Pipeline outputs are untrusted text and are only ever inserted as text, never HTML.
 - **Markdown:** `regrade run --md summary.md` and `regrade compare --md compare.md` write GitHub-flavoured summaries, ready for a CI job summary (`cat summary.md >> "$GITHUB_STEP_SUMMARY"`) or a PR comment.

@@ -76,7 +76,8 @@
     "check": "npm run lint && npm run typecheck && npm run test",
     "prepublishOnly": "npm run check && npm run build",
     "clean": "node -e \"require(\\\"node:fs\\\").rmSync(\\\"dist\\\",{recursive:true,force:true})\"",
-    "sample-report": "npm run build && node scripts/sample-report.mjs"
+    "sample-report": "npm run build && node scripts/sample-report.mjs",
+    "site": "npm run build && node scripts/sample-report.mjs --out site/sample && node scripts/site.mts --out site"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",

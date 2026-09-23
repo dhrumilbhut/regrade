@@ -1,8 +1,8 @@
 name: Sample report
 
-# Builds Regrade, runs the deterministic sample (no API keys needed), and publishes the
-# generated comparison report as a static GitHub Pages site so the README can link to a
-# real, clickable report. Requires Pages to be enabled (Settings -> Pages -> Source: GitHub Actions).
+# Builds Regrade and publishes the GitHub Pages site: the documentation pages generated from
+# README.md (scripts/site.mts), llms.txt, and the deterministic sample report under /sample
+# (no API keys needed), so the README can link to a real, clickable report. Requires Pages to be enabled (Settings -> Pages -> Source: GitHub Actions).
 # Runs on every push to main so the published page always matches the code, and can be run by hand.
 
 on:
@@ -29,7 +29,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run sample-report
+      - run: npm run site
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site

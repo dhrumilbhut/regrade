@@ -27,7 +27,8 @@ Key facts:
 
 ## Examples
 
-- [Live sample report](https://dhrumilbhut.github.io/regrade/): a healthy pipeline compared with a degraded one
+- [Documentation website](https://dhrumilbhut.github.io/regrade/): one page per how-to guide and reference topic
+- [Live sample report](https://dhrumilbhut.github.io/regrade/sample/): a healthy pipeline compared with a degraded one
 - [Example suite and mock pipeline](https://github.com/dhrumilbhut/regrade/tree/main/examples/qa-http)
 
 ## Optional
