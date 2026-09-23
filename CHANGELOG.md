@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- **README rewritten** for people and for LLMs: a one-paragraph definition, when to use Regrade, three quickstarts (no key; an OpenAI/Anthropic prompt; your own HTTP service), task-oriented how-to guides, a glossary, an FAQ and rules for AI coding assistants. The reference sections are kept.
+- The docs site now serves `llms.txt` and `llms-full.txt` (llmstxt.org). npm description and keywords broadened.
+
 ## [0.4.0]: baselines and traces
 
 Regrade in CI without a shared database, and a look inside what the agent did.

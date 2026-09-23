@@ -1,0 +1,38 @@
+# Regrade
+
+> Regrade is an open-source (MIT) command-line tool and Node.js library for regression testing LLM applications, AI agents and RAG pipelines. It runs a suite of test cases through your pipeline (an HTTP endpoint in any language, an OpenAI-compatible or Anthropic model, or a TypeScript/JavaScript function), scores every answer (exact match, LLM-as-a-judge, latency and cost limits, tool-call and step-count checks on the agent's trace, or custom functions), stores every run in a local SQLite file, and fails CI when a prompt, model or code change makes results worse. It repeats cases and uses Wilson intervals, Fisher's exact test and a case-stratified permutation test to separate real regressions from random noise.
+
+Key facts:
+
+- Install: `npx regrade` or `npm install --global regrade`. Requires Node.js 24+. npm package: `regrade`.
+- Start without an API key: `npx regrade init --ts && npx regrade run regrade/suite.mts`.
+- Suites are JSON files (schema: https://unpkg.com/regrade/schema/suite.schema.json) or TypeScript/JavaScript modules with inline scorers and in-process pipelines.
+- Adapters: `http` (POST `{"input": ...}`, expects `{"output": "..."}`), `openai` (also Azure, Ollama, vLLM, OpenRouter via `baseUrl`), `anthropic`.
+- Built-in scorers: `exactMatch`, `llmJudge`, `latencyCost`, `toolCalled`, `maxSteps`.
+- Commands: `run`, `compare`, `runs`, `show`, `report` (single-file HTML), `export` / `import` (run files), `init`, `schema`.
+- CI: commit a compact baseline (`regrade run suite.json --export regrade.baseline.json --compact`) and run `regrade compare regrade.baseline.json --fail-on-regression` in the pipeline.
+- Exit codes: 0 passed, 1 failed/flaky/errored or gate failed, 2 configuration error, 130 interrupted.
+- No telemetry, no hosted service, no default provider. Secrets are referenced as `${ENV_VAR}` and never stored.
+
+## Docs
+
+- [README (full documentation)](https://github.com/dhrumilbhut/regrade#readme): quickstart, how-to guides, concepts, reference, FAQ
+- [Full documentation as plain text](https://dhrumilbhut.github.io/regrade/llms-full.txt): the README in one file
+- [Quickstart](https://github.com/dhrumilbhut/regrade#quickstart): no-key start, testing an OpenAI or Anthropic prompt, testing your own HTTP service
+- [Baselines and CI](https://github.com/dhrumilbhut/regrade#baselines-and-ci-fail-the-pull-request-that-made-things-worse): GitHub Actions workflows that fail a pull request when quality drops
+- [Traces](https://github.com/dhrumilbhut/regrade#traces-check-what-the-agent-did-not-just-what-it-said): reporting an agent's steps and checking its tool calls
+- [The LLM judge](https://github.com/dhrumilbhut/regrade#the-llm-judge): prompt-injection hardening, structured verdicts, choosing a judge model
+- [Compare runs](https://github.com/dhrumilbhut/regrade#compare-runs-what-regressed-and-is-it-real): how regressions are separated from noise
+- [For AI coding assistants](https://github.com/dhrumilbhut/regrade#for-ai-coding-assistants): the rules for setting Regrade up correctly
+
+## Examples
+
+- [Live sample report](https://dhrumilbhut.github.io/regrade/): a healthy pipeline compared with a degraded one
+- [Example suite and mock pipeline](https://github.com/dhrumilbhut/regrade/tree/main/examples/qa-http)
+
+## Optional
+
+- [Changelog](https://github.com/dhrumilbhut/regrade/blob/main/CHANGELOG.md)
+- [Suite JSON Schema](https://unpkg.com/regrade/schema/suite.schema.json)
+- [npm package](https://www.npmjs.com/package/regrade)
+- [Security policy](https://github.com/dhrumilbhut/regrade/blob/main/SECURITY.md)

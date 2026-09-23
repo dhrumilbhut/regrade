@@ -6,7 +6,7 @@
 //
 // Everything is deterministic and needs no API keys, so CI can publish the result.
 import { createServer } from "node:http";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   buildRunReport, compareRuns, createRegistry, regressionGate, renderCompareMarkdown, renderComparison,
@@ -97,5 +97,8 @@ writeFileSync(join(outDir, "compare.md"), renderCompareMarkdown(cmp, gate, pkg.v
 writeFileSync(join(outDir, "run.md"), renderRunMarkdown(headReport, pkg.version));
 writeFileSync(join(outDir, "report.json"), JSON.stringify({ report: headReport, comparison: cmp }, null, 2));
 process.stdout.write(renderComparison(cmp, { color: false, gate }));
-process.stdout.write(`\nwritten to ${outDir}/ (index.html, compare.md, run.md, report.json)\n`);
+// For LLMs and AI assistants (llmstxt.org): a summary with links, and the whole README as plain text.
+copyFileSync(new URL("../llms.txt", import.meta.url), join(outDir, "llms.txt"));
+copyFileSync(new URL("../README.md", import.meta.url), join(outDir, "llms-full.txt"));
+process.stdout.write(`\nwritten to ${outDir}/ (index.html, compare.md, run.md, report.json, llms.txt, llms-full.txt)\n`);
 store.close();

@@ -1,42 +1,62 @@
-# Regrade
+# Regrade: regression testing for LLM apps, AI agents and RAG pipelines
 
-[![CI](https://github.com/dhrumilbhut/regrade/actions/workflows/ci.yml/badge.svg)](https://github.com/dhrumilbhut/regrade/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![npm](https://img.shields.io/npm/v/regrade.svg)](https://www.npmjs.com/package/regrade) [![CI](https://github.com/dhrumilbhut/regrade/actions/workflows/ci.yml/badge.svg)](https://github.com/dhrumilbhut/regrade/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Regression tests for AI agents and RAG pipelines. Git diff for AI behavior.**
+**Regrade is an open-source command-line tool and Node.js library for regression testing LLM applications.** It runs a suite of test cases through your real pipeline (an HTTP endpoint, an OpenAI-compatible or Anthropic model, or a TypeScript function), scores every answer with exact match, an LLM judge, latency and cost limits, or checks on the agent's tool calls, saves each run, and fails your CI build when a prompt, model or code change makes results worse. Because LLM output is random, it repeats cases and uses statistical tests to tell a real regression from noise.
 
-**[See a live sample report →](https://dhrumilbhut.github.io/regrade/)** (a healthy pipeline vs a degraded one: which cases regressed, and is it real or noise?)
+**[See a live sample report →](https://dhrumilbhut.github.io/regrade/)** (a healthy pipeline compared with a degraded one: which cases regressed, and is it real or noise?)
 
-Regrade runs a suite of test cases through your real pipeline, scores every output, saves the run, and exits non-zero when something broke, so a prompt or model change can't quietly make your app worse.
-
-- **Vendor-neutral.** MIT, no telemetry, no default provider. Test any HTTP endpoint, OpenAI-compatible API, or Anthropic model on equal footing.
-- **Built for non-determinism.** Repeat each case (`--repeat`) and Regrade labels flaky cases instead of giving you a coin-flip pass/fail.
-- **Honest scoring.** Exact match, an LLM judge hardened against prompt injection, and latency/cost thresholds. Cost accounting prices cache tokens and says "unknown" rather than guessing.
-- **Zero infrastructure.** One CLI, results in one SQLite file, suites are plain JSON you can commit.
-
-> **Status: v0.4.0.** Run, score, persist and repeat; `compare`, `runs`, `show` and single-file HTML/Markdown reports; **code suites** (TypeScript or JavaScript, with inline scorers and in-process pipelines); **baselines for CI** (run files); and **traces** (stored, shown and scored). Next: RAG scorers, judge calibration and a local dashboard.
-
-## Install
-
-Requires **Node.js 24 or newer** (the current LTS).
+| | |
+|---|---|
+| **What it is** | A CLI (`regrade`) and a TypeScript library for testing and comparing the behavior of LLM pipelines |
+| **Use it to** | Check a prompt or model change before shipping it, and block pull requests that make answers worse |
+| **Tests** | Any HTTP service (Python, Node, Go...), OpenAI and OpenAI-compatible APIs (Azure, Ollama, vLLM, OpenRouter), Anthropic Claude, or an in-process function |
+| **Scores with** | `exactMatch`, `llmJudge` (LLM-as-a-judge), `latencyCost`, `toolCalled`, `maxSteps`, or your own functions |
+| **Compares runs with** | Repeated attempts, Wilson intervals, Fisher's exact test and a paired permutation test |
+| **Needs** | Node.js 24 or newer. No server, no account, no telemetry: results go to one local SQLite file |
+| **License** | MIT |
 
 ```bash
-npx regrade --help
-npm install --global regrade
-
-# or from source
-git clone https://github.com/dhrumilbhut/regrade.git && cd regrade
-npm ci && npm run build && npm link
+npx regrade init --ts && npx regrade run regrade/suite.mts   # a working suite, no API key needed
 ```
 
-## Quickstart (no API key needed)
+## Contents
+
+- [When to use Regrade](#when-to-use-regrade) · [Quickstart](#quickstart) · [How-to guides](#how-to-guides) · [Concepts](#concepts)
+- Reference: [suite format](#suite-format) · [adapters](#adapters-what-to-test) · [scorers](#scorers) · [LLM judge](#the-llm-judge) · [code suites](#code-suites-typescript-or-javascript) · [traces](#traces-check-what-the-agent-did-not-just-what-it-said) · [repeats](#non-determinism-repeat-your-cases) · [compare](#compare-runs-what-regressed-and-is-it-real) · [baselines and CI](#baselines-and-ci-fail-the-pull-request-that-made-things-worse) · [reports](#reports) · [exit codes and storage](#exit-codes-and-storage) · [cost](#cost) · [CLI](#cli-reference) · [library](#library-api-and-custom-scorers)
+- [FAQ](#faq) · [For AI coding assistants](#for-ai-coding-assistants) · [Security and privacy](#security-and-privacy) · [Contributing](#contributing)
+
+## When to use Regrade
+
+Use Regrade when:
+
+- **You changed a prompt, a model or a retrieval setting** and want to know whether anything got worse before users notice.
+- **You are switching models** (for example from GPT to Claude, or to a cheaper model) and need evidence that answers, latency and cost stay acceptable.
+- **You want a CI check** that fails a pull request when it breaks your LLM feature, the way unit tests do for code.
+- **Your agent calls tools**, and you need to test that it calls the right one with the right arguments, without looping.
+- **Your outputs are non-deterministic**, so a single pass/fail is a coin flip and you need repeated attempts and a verdict on whether a change is real.
+- **You want to stay vendor-neutral and local**: no hosted platform, no account, results in a file you own.
+
+Something else may fit better if you need a hosted evaluation platform with a team UI, production observability and tracing of live traffic, or an extensive library of ready-made RAG metrics today. See [prior art](#prior-art).
+
+## Quickstart
+
+Requires **Node.js 24 or newer**. Use `npx regrade`, or install it: `npm install --global regrade` (or `npm i -D regrade` in a project).
+
+### 1. Try it with no API key
 
 ```bash
-regrade init                       # writes regrade/suite.json and a mock pipeline
-node regrade/mock-pipeline.mjs &   # start the mock pipeline (or use a second terminal)
-regrade run regrade/suite.json
+npx regrade init --ts            # writes regrade/suite.mts: a small suite with a stand-in agent
+npx regrade run regrade/suite.mts
 ```
 
-Prefer code? `regrade init --ts && regrade run regrade/suite.mts` scaffolds a [TypeScript suite](#code-suites-typescript-or-javascript) that needs no server at all.
+Or the JSON version, which tests a local mock HTTP service:
+
+```bash
+npx regrade init                     # writes regrade/suite.json and regrade/mock-pipeline.mjs
+node regrade/mock-pipeline.mjs &     # start the mock pipeline (or use a second terminal)
+npx regrade run regrade/suite.json
+```
 
 ```
 regrade 0.4.0 · my-first-suite · http → localhost:4000/pipeline
@@ -53,7 +73,138 @@ regrade 0.4.0 · my-first-suite · http → localhost:4000/pipeline
   run 1219f529 saved → .regrade/results.db
 ```
 
-Now point `pipeline.config.url` at your own endpoint and write your own cases.
+### 2. Test a prompt on OpenAI or Anthropic
+
+Save as `prompt.suite.json`:
+
+```json
+{
+  "$schema": "https://unpkg.com/regrade/schema/suite.schema.json",
+  "name": "support-prompt",
+  "defaults": { "judge": "openai:gpt-4.1-nano", "repeat": 3 },
+  "pipeline": {
+    "adapter": "openai",
+    "config": { "model": "gpt-6-luna", "system": "You are a concise support agent. Returns are accepted within 30 days." }
+  },
+  "cases": [
+    {
+      "id": "refund-window",
+      "input": "Can I return an item after 40 days?",
+      "expected": "No: returns are accepted within 30 days.",
+      "scorers": ["llmJudge"]
+    },
+    { "id": "one-word", "input": "Reply with only the word OK.", "expected": "OK", "scorers": ["exactMatch"] }
+  ]
+}
+```
+
+```bash
+export OPENAI_API_KEY=sk-...           # PowerShell: $env:OPENAI_API_KEY="sk-..."
+npx regrade run prompt.suite.json --label prompt-v1
+# edit the system prompt, then:
+npx regrade run prompt.suite.json --label prompt-v2
+npx regrade compare                    # what changed between the two runs, and is it real?
+```
+
+For Claude, use `"adapter": "anthropic"`, a model such as `"claude-haiku-4-5"`, and `ANTHROPIC_API_KEY`.
+
+### 3. Test your own service (any language)
+
+Expose one endpoint that takes `{ "input": ... }` and returns `{ "output": "..." }`, then point a suite at it: see [test a Python, LangChain or other HTTP service](#test-a-python-langchain-or-other-http-service).
+
+## How-to guides
+
+### Check whether a prompt or model change made things worse
+
+Run the suite before and after the change, with a few attempts per case, then compare:
+
+```bash
+regrade run suite.json --repeat 5 --label before
+# change the prompt, the model, the retrieval settings...
+regrade run suite.json --repeat 5 --label after
+regrade compare --fail-on-regression
+```
+
+`compare` lists regressed, improved, flaky and changed cases, with pass rates and p-values, and an overall verdict. See [compare](#compare-runs-what-regressed-and-is-it-real).
+
+### Fail a GitHub pull request when LLM quality drops
+
+Commit a compact baseline once, then compare every pull request against it:
+
+```bash
+regrade run regrade/suite.json --repeat 3 --export regrade.baseline.json --compact
+git add regrade.baseline.json && git commit -m "Add Regrade baseline"
+```
+
+In CI: `regrade run … || test $? -eq 1`, then `regrade compare regrade.baseline.json --fail-on-regression --md regrade.md`. Complete workflow files are in [baselines and CI](#baselines-and-ci-fail-the-pull-request-that-made-things-worse).
+
+### Test a Python, LangChain or other HTTP service
+
+Regrade calls your service over HTTP, so it works with any language or framework (FastAPI, Flask, Express, LangChain, LlamaIndex...). The service needs one endpoint:
+
+```python
+# FastAPI example: POST {"input": ...} -> {"output": "..."}
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.post("/regrade")
+def regrade(body: dict):
+    answer = my_chain.invoke(body["input"])   # your LangChain chain, agent, or plain function
+    return {"output": answer}
+```
+
+```json
+{
+  "name": "my-service",
+  "pipeline": { "adapter": "http", "config": { "url": "${PIPELINE_URL:-http://localhost:8000/regrade}" } },
+  "cases": [{ "id": "greeting", "input": "Say hello", "scorers": ["llmJudge"] }],
+  "defaults": { "judge": "anthropic:claude-haiku-4-5" }
+}
+```
+
+The response may also include `costUsd`, `usage` (token counts) and `steps` (a trace of tool calls and LLM calls) for cost checks and [trace scorers](#traces-check-what-the-agent-did-not-just-what-it-said).
+
+### Test that an AI agent calls the right tool
+
+Return the agent's steps (from HTTP, or with `tracer()` in a function pipeline), then score them:
+
+```json
+"scorers": ["toolCalled", "maxSteps"],
+"scorerConfig": {
+  "toolCalled": { "tool": "lookup_order", "argsInclude": { "orderId": 123 } },
+  "maxSteps": { "max": 8 }
+}
+```
+
+See [traces](#traces-check-what-the-agent-did-not-just-what-it-said).
+
+### Use an LLM as a judge
+
+Add `"llmJudge"` to a case's scorers, write a rubric in `scorerConfig.llmJudge.rubric`, and choose a judge model with `defaults.judge`, `--judge provider:model` or `REGRADE_JUDGE`. Use a different model from the one being tested. See [the LLM judge](#the-llm-judge).
+
+### Deal with flaky, non-deterministic outputs
+
+Run each case several times with `--repeat 5`. A case that passes on some attempts and fails on others is labelled **flaky**. `compare` then decides whether a change in pass rate is bigger than the noise. See [repeats](#non-determinism-repeat-your-cases).
+
+### Check latency and cost
+
+Add `"latencyCost"` with `maxLatencyMs` and/or `maxCostUsd`. Cost comes from token usage and a bundled price table; unknown prices are reported as unknown, never guessed. See [cost](#cost).
+
+## Concepts
+
+| Term | Meaning |
+|---|---|
+| **Suite** | A JSON file (or a TypeScript/JavaScript module) listing the pipeline to test and the test cases |
+| **Case** | One input, an optional expected answer, and the scorers to run. Its `id` must stay stable across runs |
+| **Attempt** | One execution of a case. With `--repeat 5`, each case has 5 attempts |
+| **Scorer** | A check on an attempt's output or trace; returns pass or fail (or an error if it could not evaluate) |
+| **Verdict** | Per case: **passed** (all attempts pass), **failed** (none pass), **flaky** (a mix), **errored** (no verdict possible, e.g. pipeline down) |
+| **Run** | One execution of a suite, saved with every attempt, score and trace |
+| **Run file** | A portable JSON copy of a run; **compact** run files hold only what comparisons need and are safe to commit |
+| **Baseline** | The run you compare against, usually a committed compact run file |
+| **Trace** | The steps an attempt took (LLM calls, tool calls, retrievals), reported by the pipeline |
+| **Modified** | A case whose definition, scorer code or judge model changed between two runs; listed, never counted as a regression |
 
 ## Suite format
 
@@ -101,9 +252,10 @@ A suite is a JSON file. Add `"$schema"` for editor autocomplete and validation (
 | `cases[].input` | A string, `{ "messages": [...] }` (chat history), or any object (sent as-is to HTTP pipelines; LLM adapters need `inputTemplate`). |
 | `cases[].expected` | Reference answer. Required by `exactMatch`; optional context for `llmJudge`. |
 | `cases[].scorers` | Names of scorers to run. `scorerConfig.<name>` holds that scorer's options. |
+| `cases[].tags` | Labels for filtering with `--tag`. |
 | `cases[].repeat` / `timeoutMs` | Per-case overrides. CLI flags beat case values, which beat `defaults`. |
 | `${VAR}` / `${VAR:-default}` | Environment placeholders, allowed in any string of `pipeline.config`. **Secrets belong here, never in the file.** A missing variable stops the run before anything is sent. |
-| `pricing` | Optional extra/override model prices (see [Cost](#cost)). |
+| `pricing` | Optional extra/override model prices (see [cost](#cost)). |
 
 Unknown keys are rejected, so typos like `scorer` (instead of `scorers`) fail loudly, with the JSON path.
 
@@ -119,15 +271,15 @@ Regrade POSTs `{ "input": <case input> }` and expects `{ "output": "<string>" }`
 
 Options: `url`, `method` (POST/PUT/PATCH), `headers`, `outputField` (default `output`), `retries`, `retryBaseDelayMs`.
 
-The pipeline can also report `costUsd`, `usage`, `steps` (a trace) and `metadata` in its response. Cost and usage are used, and `steps` are stored and can be scored (see [Traces](#traces-check-what-the-agent-did-not-just-what-it-said)). A Python (FastAPI/Flask), Node, or Go service needs only this one endpoint.
+The pipeline can also report `costUsd`, `usage`, `steps` (a trace) and `metadata` in its response. Cost and usage are used, and `steps` are stored and can be scored (see [traces](#traces-check-what-the-agent-did-not-just-what-it-said)).
 
 ### OpenAI (and anything OpenAI-compatible)
 
 ```json
-{ "adapter": "openai", "config": { "model": "gpt-4o", "system": "Be concise.", "temperature": 0, "maxTokens": 300 } }
+{ "adapter": "openai", "config": { "model": "gpt-6-luna", "system": "Be concise.", "maxTokens": 300 } }
 ```
 
-Reads `OPENAI_API_KEY`. Set `baseUrl` (or `OPENAI_BASE_URL`) to use Ollama, vLLM, OpenRouter, Azure, or a local stub.
+Reads `OPENAI_API_KEY`. Set `baseUrl` (or `OPENAI_BASE_URL`) to use Ollama, vLLM, OpenRouter, Azure, or a local stub. `temperature` is sent only if you set it (current OpenAI reasoning models accept only their default).
 
 ### Anthropic
 
@@ -139,6 +291,10 @@ Reads `ANTHROPIC_API_KEY` (and `ANTHROPIC_BASE_URL`). `maxTokens` defaults to 10
 
 Both LLM adapters accept `apiKeyEnv` (to name a different env var), `inputTemplate` (e.g. `"{{question}}"`, to turn an object input into a prompt), and `retries`. Retries happen only for network errors, HTTP 429 and 5xx (honouring `Retry-After`); latency is that of the final successful attempt.
 
+### A function in your own process
+
+Write the suite in TypeScript or JavaScript and give it `pipeline: { run: async (input) => ... }`: see [code suites](#code-suites-typescript-or-javascript).
+
 ## Scorers
 
 | Scorer | What it does |
@@ -148,22 +304,23 @@ Both LLM adapters accept `apiKeyEnv` (to name a different env var), `inputTempla
 | `latencyCost` | Records latency and **fails** if `maxLatencyMs` or `maxCostUsd` is exceeded. With no thresholds it always passes. If `maxCostUsd` is set but the cost is unknown it reports an error, not a silent pass. |
 | `toolCalled` | Checks the pipeline's [trace](#traces-check-what-the-agent-did-not-just-what-it-said): was a tool called (with these arguments, this many times), or not called. |
 | `maxSteps` | Checks the trace: did the attempt finish within a step budget (optionally of one kind)? |
+| *your own* | Any function in a [code suite](#code-suites-typescript-or-javascript), or a scorer registered through the [library](#library-api-and-custom-scorers). |
 
-### About the LLM judge
+### The LLM judge
 
 Judge scores are useful, but **they are not ground truth**. Studies find raw judge agreement overstates real accuracy, and judges can be talked into passing bad answers. Regrade takes these precautions:
 
-- The pipeline output is untrusted text. It is fenced inside a per-call random delimiter, and the judge is told everything inside is data, never instructions.
-- The judge must return schema-validated JSON (`{reasoning, verdict}`, reasoning first) using the provider's native structured output, at temperature 0. Models that accept only their default temperature (such as current OpenAI reasoning models) reject that; Regrade then asks again without it, so those judges run at their default temperature, and it warns you, because their verdicts can vary more between runs.
+- **Prompt-injection resistant.** The pipeline output is untrusted text. It is fenced inside a per-call random delimiter, and the judge is told everything inside is data, never instructions.
+- **Structured verdicts.** The judge must return schema-validated JSON (`{reasoning, verdict}`, reasoning first) using the provider's native structured output, at temperature 0. Models that accept only their default temperature (such as current OpenAI reasoning models) reject that; Regrade then asks again without it, so those judges run at their default temperature, and it warns you, because their verdicts can vary more between runs.
 - **Checked before the run.** Before any case runs, Regrade asks each judge one trivial question. If the judge cannot answer with a valid verdict (unknown model, bad key, no structured output), the run stops with exit 2 and says why, instead of erroring every attempt. It costs one tiny call per judge; `--no-judge-check` skips it.
 - **Fail closed.** A malformed, refused or failed judge response makes the attempt **errored**, never an implicit pass.
-- Judge spend is recorded separately from pipeline cost, and every verdict records which judge model produced it and at what temperature (`regrade show` and the HTML report display it).
-- Regrade warns when the judge model is the same as the pipeline model (judges favour their own output).
+- **Recorded.** Judge spend is recorded separately from pipeline cost, and every verdict records which judge model produced it and at what temperature (`regrade show` and the HTML report display it).
+- **Self-preference warning.** Regrade warns when the judge model is the same as the pipeline model (judges favour their own output).
 - **Changing the judge is a change, not a regression.** The judge model is part of each judged case's identity, so `regrade compare` reports those cases as `modified` when two runs used different judges.
 
-Choose a judge by measured cost, not list price: reasoning models can spend hundreds of hidden tokens on one verdict. In a small test (2026-09-23), `gpt-5-nano` (the lowest list price) used 400 to 900 output tokens per verdict and cost about ten times more than `gpt-4.1-nano` or `gpt-6-luna`, which used about 40.
+**Choosing a judge model.** Pick by measured cost per verdict, not list price: reasoning models can spend hundreds of hidden tokens on one verdict. In a small test (2026-09-23), `gpt-5-nano` (the lowest list price) used 400 to 900 output tokens per verdict and cost about ten times more than `gpt-4.1-nano` or `gpt-6-luna`, which used about 40.
 
-It is still a single LLM making a judgment. Use an exact or programmatic check where you can, and treat judge results as one signal. Judge calibration against human labels is planned for Phase 2.
+It is still a single LLM making a judgment. Use an exact or programmatic check where you can, and treat judge results as one signal. Calibrating judges against human labels is planned.
 
 ## Code suites: TypeScript or JavaScript
 
@@ -202,8 +359,8 @@ export default {
 } satisfies CodeSuite;
 ```
 
-- **What is allowed:** everything a JSON suite has, plus `scorers` (name → function) and a `pipeline` with a `run` function. Built-in scorers (`exactMatch`, `llmJudge`, `latencyCost`) sit alongside yours. A scorer may also be an object `{ score, requiresExpected?, preflight?, fingerprint? }`. `export default` may be an (async) function that returns the suite.
-- **TypeScript without tooling:** Node imports `.ts` / `.mts` files natively by stripping types: no loader, no build step, no extra dependency. That means type syntax only (no `enum`, `namespace` or parameter properties), and local imports must include the `.ts` extension. `import type { CodeSuite } from "regrade"` is erased, so `npx regrade` works without installing anything in your project (a *value* import such as `defineSuite` needs `npm i -D regrade`). Prefer plain JavaScript? A `.mjs` suite has the same shape.
+- **What is allowed:** everything a JSON suite has, plus `scorers` (name → function) and a `pipeline` with a `run` function. Built-in scorers sit alongside yours. A scorer may also be an object `{ score, requiresExpected?, preflight?, fingerprint? }`. `export default` may be an (async) function that returns the suite.
+- **TypeScript without tooling:** Node imports `.ts` / `.mts` files natively by stripping types: no loader, no build step, no extra dependency. That means type syntax only (no `enum`, `namespace` or parameter properties), and local imports must include the `.ts` extension. `import type { CodeSuite } from "regrade"` is erased, so `npx regrade` works without installing anything in your project (a *value* import such as `defineSuite` or `tracer` needs `npm i -D regrade`). Prefer plain JavaScript? A `.mjs` suite has the same shape.
 - **File extension and module type:** suites are ES modules. A plain `.ts` (or `.js`) file is treated as an ES module only if your `package.json` says `"type": "module"`; `npm init` writes `"type": "commonjs"`, in which case use **`.mts`** / **`.mjs`** (what `regrade init --ts` does, so it works in any project), and give local helper files the same treatment. Regrade tells you when this is the problem.
 - **Timeouts are enforced for you.** Every attempt and every scorer is bounded by `--timeout` (default 30 s), even if your code ignores the `AbortSignal` it is given; a hung function becomes an *errored* attempt, not a hung run.
 - **Editing a scorer is a change, not a regression.** Each inline scorer is fingerprinted from its source, and the fingerprint is part of its cases' identity, so after you edit one, `regrade compare` reports those cases as `modified` instead of comparing results produced by different logic. (Changes in code the scorer *imports* are not detected: bump `fingerprint` if you keep logic in a helper.)
@@ -263,7 +420,7 @@ Your own scorers receive the full trace as `trace` in their arguments.
 
 **See it:** `regrade show <run> <case>` prints the step tree with durations (`--full` adds each step's input and output), and the HTML report has a collapsible trace with timing bars under each attempt. Run files include traces, except compact ones.
 
-**What is stored.** Values under secret-looking keys (`authorization`, `api_key`, `token`, `password`...) are masked, step inputs and outputs longer than 20,000 characters are clipped, and at most 1,000 steps are kept per attempt; anything cut is marked. Traces live in their own table, so reads that don't need them (such as `compare`) stay fast. `regrade run --no-trace` stores none; scorers still see them.
+**What is stored.** Values under secret-looking keys (`authorization`, `api_key`, `token`, `password`...) are masked, step inputs and outputs longer than 20,000 characters are clipped, and at most 1,000 steps are kept per attempt; anything cut is marked. `regrade run --no-trace` stores none; scorers still see them.
 
 ## Non-determinism: repeat your cases
 
@@ -272,6 +429,8 @@ regrade run suite.json --repeat 5
 ```
 
 Each case runs 5 times as separate attempts. A case where every attempt passes is **passed**, none **failed**, and a mix is **flaky**, which exits non-zero. One green run of a stochastic pipeline proves little; repeated attempts show you the real pass rate. Every attempt is stored, and [`regrade compare`](#compare-runs-what-regressed-and-is-it-real) uses them to tell a real regression from noise.
+
+`--min-pass-rate 0.9` replaces "every case must pass" with "at least 90% of attempts must pass" (errored attempts count as not passed), for suites where some flakiness is acceptable. Then use `compare` to catch it getting worse.
 
 ## Compare runs: what regressed, and is it real?
 
@@ -321,7 +480,7 @@ regrade report <run> --against regrade.baseline.json --out report.html
 regrade import run.json                                # load a full run file into the database
 ```
 
-**Compact run files** (`--compact`) keep only what a comparison needs: case ids and hashes, attempt statuses, latency, cost and each scorer's pass/fail. They leave out inputs, expected answers, outputs, error messages and judge reasoning, so they are small and safe to commit. They can be compared against, but not imported or turned into a report of their own.
+**Compact run files** (`--compact`) keep only what a comparison needs: case ids and hashes, attempt statuses, latency, cost and each scorer's pass/fail. They leave out inputs, expected answers, outputs, error messages, judge reasoning and traces, so they are small and safe to commit. They can be compared against, but not imported or turned into a report of their own.
 
 (A `--json` report is not a run file: it has no case hashes, so it can't be used as a baseline.)
 
@@ -412,34 +571,29 @@ jobs:
 
 A [live example](https://dhrumilbhut.github.io/regrade/) is published from the deterministic sample (`npm run sample-report`).
 
-- **HTML:** `regrade report <run> [--against <base>] --out report.html` writes one self-contained file: no network access, no external assets, opens from `file://`, light and dark themes, filter and search, and per-case drill-down with inputs, outputs, scores and judge reasoning. Pipeline outputs are untrusted text and are only ever inserted as text, never HTML. Try the deterministic sample with `npm run sample-report`, which writes `site/index.html`.
+- **HTML:** `regrade report <run> [--against <base>] --out report.html` writes one self-contained file: no network access, no external assets, opens from `file://`, light and dark themes, filter and search, and per-case drill-down with inputs, outputs, scores, judge reasoning and traces. Pipeline outputs are untrusted text and are only ever inserted as text, never HTML.
 - **Markdown:** `regrade run --md summary.md` and `regrade compare --md compare.md` write GitHub-flavoured summaries, ready for a CI job summary (`cat summary.md >> "$GITHUB_STEP_SUMMARY"`) or a PR comment.
-- **JSON:** `--json` on `run` and `compare`.
+- **JSON:** `--json` on `run` and `compare`, for scripts and dashboards.
+- **Console:** `regrade runs` lists saved runs; `regrade show <run> [case]` prints a run, or one case's input, outputs, scores and trace.
 
-## Results, exit codes, storage
+## Exit codes and storage
 
 | Exit code | Meaning |
 |---|---|
 | `0` | every case passed (or `--min-pass-rate` was met) |
 | `1` | at least one case failed, was flaky, or **errored** (a broken pipeline is never green); for `compare --fail-on-regression`, the gate failed |
-| `2` | usage or configuration error; nothing was run (invalid suite, missing env var, bad flag) |
+| `2` | usage or configuration error; nothing was run (invalid suite, missing env var, bad flag, a judge that does not work) |
 | `130` | interrupted (Ctrl+C); attempts finished so far are saved and the run is marked `interrupted` |
 
 - **Errored vs failed:** *failed* means the pipeline answered and a scorer said no. *Errored* means Regrade couldn't get a verdict (pipeline down, timeout, judge unavailable). The console and the JSON report keep them apart.
-- **SQLite** (`.regrade/results.db`, or `--db`): tables `runs`, `results` (one row per case per attempt, with snapshots of the input and expected values), and `scores`. Runs are written incrementally, so a crash keeps what completed.
-- `--json report.json` writes a versioned JSON report for CI or scripts.
-
-```bash
-regrade run suite.json --json report.json --repeat 3 --tag smoke --label prompt-v7
-```
-
-`--min-pass-rate 0.9` replaces "every case must pass" with "at least 90% of attempts must pass" (errored attempts count as not passed), for suites where some flakiness is acceptable. Then use `compare` to catch it getting worse.
+- **Where results are stored:** one SQLite file, `.regrade/results.db` (or `--db <path>`), with tables `runs`, `results` (one row per attempt, with snapshots of the input and expected values), `scores` and `traces`. Runs are written incrementally, so a crash keeps what completed, and older databases upgrade automatically.
+- Nothing is written anywhere else unless you ask for a file (`--json`, `--md`, `--export`, `report --out`).
 
 ## Cost
 
 Cost is computed from the provider's reported token usage, priced **per category**: regular input, cache reads, cache writes (5-minute and 1-hour), and output. If a model has no known price, or usage is missing, the cost is **unknown** (shown as such), never guessed.
 
-Prices ship in `src/pricing/prices.json` (dated 2026-09-23): current Anthropic models, and OpenAI's GPT-6, GPT-5.x, GPT-4.1, GPT-4o and o4-mini families. Where OpenAI shows no cache-read or cache-write price for a model, a call that uses one has unknown cost. Things to know:
+Prices ship in [`src/pricing/prices.json`](https://github.com/dhrumilbhut/regrade/blob/main/src/pricing/prices.json) (dated 2026-09-23): current Anthropic models, and OpenAI's GPT-6, GPT-5.x, GPT-4.1, GPT-4o and o4-mini families. Where OpenAI shows no cache-read or cache-write price for a model, a call that uses one has unknown cost. Things to know:
 
 - **Short-context prices only.** OpenAI also charges higher per-token prices above a context-size threshold; that tier is *not* modelled, so requests in it are under-priced. Supply an override if you use it.
 - **Promotions expire.** `gpt-5.6-sol` is priced at its promotional rate through 2026-11-21 and at the standard rate afterwards (`validUntil` on the entry). If a promotion is extended, Regrade will over-report cost until you override it.
@@ -474,20 +628,22 @@ regrade run <suite> [options]     Run a suite (.json, or a code suite: .ts .mts 
   --prices <file>                 extra/override model prices
   --no-color                      plain output (also honours NO_COLOR; set REGRADE_ASCII=1 for ASCII symbols)
 regrade runs [--suite <name>] [--limit <n>]        List saved runs, newest first
-regrade show <run> [case] [--full]                 A run's summary, or one case's input, outputs and scores
+regrade show <run> [case] [--full]                 A run's summary, or one case's input, outputs, scores and trace
 regrade compare [base] [head] [options]            What regressed, improved, or is just flaky; runs are ids or run files
   --fail-on-regression | --significant-only        exit 1 when the gate fails
   --all  --json <file>  --md <file>  --suite <name>
 regrade report <run> [--against <base>] [--out <file>]   Single-file HTML report (runs are ids or run files)
 regrade export <run> [--out <file>] [--compact]    Write a run file (a baseline to commit, or to compare or import elsewhere)
 regrade import <file>                              Load a full run file into the database
-regrade init [--dir <dir>] [--force] [--ts]   Scaffold an example suite (--ts: a code suite, no server needed)
-regrade schema [--out <file>]          Print the suite JSON Schema
+regrade init [--dir <dir>] [--force] [--ts]        Scaffold an example suite (--ts: a code suite, no server needed)
+regrade schema [--out <file>]                      Print the suite JSON Schema
 ```
 
-## Adding a custom scorer
+Environment variables: `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, `REGRADE_JUDGE` (default judge), `NO_COLOR`, `REGRADE_ASCII`, plus any `${VAR}` your suite references.
 
-The easy way is an inline scorer in a [code suite](#code-suites-typescript-or-javascript). To reuse scorers across projects, or to run Regrade from your own program, register them on a registry and call the library:
+## Library API and custom scorers
+
+The easy way to add a scorer is an inline scorer in a [code suite](#code-suites-typescript-or-javascript). To reuse scorers across projects, or to run Regrade from your own program, register them on a registry and call the library:
 
 ```ts
 import { createRegistry, loadSuite, runSuite, SqliteStore } from "regrade";
@@ -506,18 +662,75 @@ const outcome = await runSuite({ suite, registry, store, regradeVersion: "custom
 process.exitCode = outcome.exitCode;
 ```
 
-`score` receives `{ input, expected, output, config, meta: { latencyMs, costUsd, usage, ... }, runtime }` and returns `{ pass, value, reasoning?, costUsd?, error? }`. Return `error` (rather than `pass: false`) when you *couldn't* evaluate, so the attempt is recorded as errored. Custom adapters work the same way through `registerAdapter`. The adapter and scorer interfaces are the library's stable contracts.
+`score` receives `{ input, expected, output, config, meta: { latencyMs, costUsd, usage, ... }, trace, runtime }` and returns `{ pass, value, reasoning?, costUsd?, error?, metadata? }`. Return `error` (rather than `pass: false`) when you *couldn't* evaluate, so the attempt is recorded as errored. Custom adapters work the same way through `registerAdapter`. The adapter and scorer interfaces are the library's stable contracts and change only additively.
 
-## Security & privacy
+Other exports include `compareRuns`, `regressionGate`, `renderHtmlReport`, `renderRunMarkdown`, `renderCompareMarkdown`, `buildRunFile`, `readRunFile`, `tracer`, `defineSuite` and the statistics helpers (`wilsonInterval`, `fisherExact`, `stratifiedPermutationTest`). Type definitions ship with the package.
+
+## FAQ
+
+**What is Regrade?**
+An open-source (MIT) CLI and Node.js library for regression testing LLM applications, AI agents and RAG pipelines: it runs test cases through your pipeline, scores the answers, stores every run, and tells you whether a change made results worse, with statistics that account for non-determinism.
+
+**Does it need an API key?**
+No, not to start: `regrade init --ts` and `regrade init` run without one. You need a provider key only for the `openai` / `anthropic` adapters or for `llmJudge`.
+
+**Does it work with Python, LangChain or LlamaIndex?**
+Yes, through the HTTP adapter: expose one endpoint that takes `{ "input": ... }` and returns `{ "output": "..." }` ([example](#test-a-python-langchain-or-other-http-service)). Regrade itself runs on Node.js 24+, which CI runners already have.
+
+**Can I use local or self-hosted models (Ollama, vLLM)?**
+Yes: use the `openai` adapter with `baseUrl` pointing at any OpenAI-compatible server, for the pipeline or for the judge (`OPENAI_BASE_URL`).
+
+**Which LLM should I use as the judge?**
+A different model from the one being tested, ideally one that accepts temperature 0, chosen by measured cost per verdict. `gpt-4.1-nano` is a cheap choice that worked well in our tests; see [the LLM judge](#the-llm-judge).
+
+**How many repeats do I need?**
+For a single case to show a *significant* drop, about 5 attempts per side (5/5 → 0/5 gives p = 0.008; 3/3 → 0/3 is only p = 0.1). Across many cases, fewer attempts can still show a significant overall drop. Start with `--repeat 3` and raise it for important suites.
+
+**Where are my results stored, and does Regrade send data anywhere?**
+In `.regrade/results.db` on your machine. Regrade contacts only the pipeline and providers you configure. There is no telemetry and no update check.
+
+**How do I run it in GitHub Actions or another CI system?**
+Commit a compact baseline and run `regrade compare regrade.baseline.json --fail-on-regression` in the job. Any CI that runs Node.js works; copy-paste GitHub workflows are in [baselines and CI](#baselines-and-ci-fail-the-pull-request-that-made-things-worse).
+
+**How is Regrade different from Promptfoo, DeepEval, Inspect AI or Ragas?**
+Those are mature evaluation tools, several with broader feature sets or hosted options. Regrade focuses narrowly on *regression testing*: repeated attempts per case, significance tests on the change between two runs, run files as CI baselines, and zero infrastructure, with no default provider. See [prior art](#prior-art).
+
+**Is the LLM judge reliable?**
+It is hardened (prompt-injection fencing, structured output, fail-closed, pre-run check), but it is still one model's opinion. Prefer `exactMatch`, `toolCalled` or your own programmatic scorers where possible, and repeat cases.
+
+**Is it free?**
+Yes, MIT-licensed. You pay only your model providers for the calls your suites make.
+
+## For AI coding assistants
+
+If you are an AI assistant setting up Regrade for a user, these facts are enough to do it correctly:
+
+1. Requires Node.js 24+. Run it with `npx regrade <command>`; `npm i -D regrade` only if the suite imports values (`tracer`, `defineSuite`) from `"regrade"`.
+2. Scaffold with `npx regrade init --ts` (code suite, no server, no key) or `npx regrade init` (JSON suite plus mock HTTP pipeline). In a CommonJS project use `.mts` / `.mjs` for code suites.
+3. A JSON suite needs `name`, `pipeline: { adapter, config }` (`http` | `openai` | `anthropic`) and `cases[]` with a stable `id`, an `input` and `scorers`. Add `"$schema": "https://unpkg.com/regrade/schema/suite.schema.json"`. Unknown keys are errors.
+4. Never put secrets in suite files: use `${ENV_VAR}` placeholders in `pipeline.config`. Keys come from `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`.
+5. `exactMatch` requires `expected`. `llmJudge` needs a judge (`defaults.judge: "provider:model"`), preferably not the pipeline's own model. `toolCalled` / `maxSteps` need the pipeline to return `steps`.
+6. Use `--repeat 3` or more for LLM pipelines. Exit codes: 0 all passed, 1 failures/flaky/errored or gate failed, 2 configuration error, 130 interrupted.
+7. To gate CI: create `regrade.baseline.json` with `run --export regrade.baseline.json --compact`, commit it, and in CI run `regrade run … || test $? -eq 1` then `regrade compare regrade.baseline.json --fail-on-regression`.
+8. Add `.regrade/` to `.gitignore` (`init` does this): the database holds raw inputs and outputs.
+
+A machine-readable summary is at [dhrumilbhut.github.io/regrade/llms.txt](https://dhrumilbhut.github.io/regrade/llms.txt), and this README as plain text at [llms-full.txt](https://dhrumilbhut.github.io/regrade/llms-full.txt).
+
+## Security and privacy
 
 - Suite files are safe to commit: secrets are referenced as `${ENV_VAR}`. Resolved values are never written to the database; hard-coded secrets are masked before storing (with a warning).
 - The database contains your raw inputs and outputs (and pipeline traces), which may be sensitive. `regrade init` git-ignores `.regrade/`. Values under secret-looking keys in traces are masked before storing; `--no-trace` stores none. Compact run files contain no inputs, outputs or traces.
 - Regrade contacts only the URLs and providers you configure. There is no telemetry and no update check.
-- See [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
+- Code suites are programs: only run suites you trust.
+- Releases are published from GitHub Actions with npm provenance. See [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
 
 ## Prior art
 
 Regrade stands on ideas from [Promptfoo](https://www.promptfoo.dev), [DeepEval](https://deepeval.com), [Inspect AI](https://inspect.aisi.org.uk), and Ragas, and on the pass@k / pass^k reliability framing from τ-bench. If you need a hosted platform, deep RAG metrics today, or production observability, those tools are excellent. Regrade's bet is a small, vendor-neutral, statistically honest regression tool you can run anywhere.
+
+## Roadmap
+
+Shipped: suites (JSON and code), HTTP / OpenAI / Anthropic / function pipelines, five built-in scorers, repeats and flakiness, `compare` with significance tests, HTML / Markdown / JSON reports, run files and CI baselines, traces. Next: RAG scorers built on retrieval steps, judge calibration against human labels, and a local dashboard. See [CHANGELOG.md](CHANGELOG.md) for what changed in each release.
 
 ## Development
 
