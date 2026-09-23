@@ -24,9 +24,9 @@ export function requireRun(store: Store, ref: string): RunRecord {
 
 export type RunWithAttempts = LoadedRun;
 
-export function loadRun(store: Store, ref: string): RunWithAttempts {
+export function loadRun(store: Store, ref: string, opts: { traces?: boolean } = {}): RunWithAttempts {
   const run = requireRun(store, ref);
-  return { run, attempts: store.getAttempts(run.runId) };
+  return { run, attempts: store.getAttempts(run.runId, opts) };
 }
 
 /**
@@ -79,8 +79,8 @@ export class RunSource {
     return this.opened;
   }
 
-  load(ref: string): LoadedRun {
-    return isRunFileRef(ref) ? readRunFile(ref) : loadRun(this.store(), ref);
+  load(ref: string, opts: { traces?: boolean } = {}): LoadedRun {
+    return isRunFileRef(ref) ? readRunFile(ref) : loadRun(this.store(), ref, opts);
   }
 
   /**

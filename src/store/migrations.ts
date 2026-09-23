@@ -73,6 +73,19 @@ CREATE INDEX idx_scores_res   ON scores(result_id);
     description: "scores.metadata_json: how a score was produced (e.g. the judge model and temperature)",
     sql: `ALTER TABLE scores ADD COLUMN metadata_json TEXT;`,
   },
+  {
+    version: 3,
+    description: "traces (one JSON row per attempt, kept apart so trace-free reads stay fast) and the remaining token counts",
+    sql: `
+CREATE TABLE traces (
+  result_id  INTEGER PRIMARY KEY REFERENCES results(result_id) ON DELETE CASCADE,
+  trace_json TEXT NOT NULL
+);
+ALTER TABLE results ADD COLUMN cache_write_tokens INTEGER;
+ALTER TABLE results ADD COLUMN cache_write_1h_tokens INTEGER;
+ALTER TABLE results ADD COLUMN reasoning_tokens INTEGER;
+`,
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = migrations[migrations.length - 1]?.version ?? 0;

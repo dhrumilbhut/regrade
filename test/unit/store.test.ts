@@ -1,11 +1,11 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
 import { ConfigError } from "../../src/core/errors.js";
 import type { RunSummary } from "../../src/core/types.js";
-import { LATEST_SCHEMA_VERSION } from "../../src/store/migrations.js";
+import { LATEST_SCHEMA_VERSION, migrations } from "../../src/store/migrations.js";
 import { SqliteStore } from "../../src/store/sqliteStore.js";
 import { attempt } from "../helpers.js";
 
@@ -203,15 +203,17 @@ describe("SqliteStore", () => {
     expect(a?.scores[1]?.metadata).toBeUndefined();
   });
 
-  it("upgrades a version 1 database in place, keeping its runs", () => {
+  it("upgrades a version 1 database (0.1 to 0.3) in place, keeping its runs", () => {
     const path = tmpDb();
-    open(path).close();
+    mkdirSync(dirname(path), { recursive: true });
     const raw = new Database(path);
-    raw.exec("ALTER TABLE scores DROP COLUMN metadata_json");
+    raw.exec(migrations[0]!.sql);
     raw.pragma("user_version = 1");
+    raw.prepare("INSERT INTO runs (run_id, suite_name, suite_hash, started_at, status, regrade_version, pipeline_json) VALUES ('old', 's', 'h', '2026-09-01', 'completed', '0.3.1', '{}')").run();
     raw.close();
     const store = open(path);
     expect(store.schemaVersion()).toBe(LATEST_SCHEMA_VERSION);
+    expect(store.getRun("old")).toMatchObject({ runId: "old", regradeVersion: "0.3.1" });
     store.createRun(newRun("after-upgrade"));
     store.saveAttempt("after-upgrade", attempt({ scores: [{ scorerName: "llmJudge", pass: true, value: 1, metadata: { judge: "x:y" } }] }));
     expect(store.getAttempts("after-upgrade")[0]?.scores[0]?.metadata).toEqual({ judge: "x:y" });

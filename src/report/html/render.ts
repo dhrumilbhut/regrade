@@ -1,4 +1,4 @@
-import type { AttemptRecord } from "../../core/types.js";
+import type { AttemptRecord, TraceStep } from "../../core/types.js";
 import type { Comparison } from "../../stats/compare.js";
 import { wilsonInterval } from "../../stats/wilson.js";
 import { scoreNote } from "../format.js";
@@ -37,6 +37,35 @@ function clip(s: string, max: number): string {
 
 const asText = (v: unknown): string => (typeof v === "string" ? v : JSON.stringify(v, null, 2));
 
+/** Per-step text in the report is short: the full step data stays in the database, run files and JSON report. */
+const TRACE_TEXT_CHARS = 2_000;
+const STEP_KINDS = new Set(["llm", "tool", "retrieval", "agent", "other"]);
+
+interface ReportStep {
+  kind: string;
+  name: string;
+  start: number | null;
+  duration: number | null;
+  error: string | null;
+  input: string | null;
+  output: string | null;
+  children: ReportStep[];
+}
+
+function reportTrace(steps: readonly TraceStep[]): ReportStep[] {
+  const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  return steps.map((s) => ({
+    kind: STEP_KINDS.has(s.kind) ? s.kind : "other",
+    name: String(s.name),
+    start: n(s.startOffsetMs),
+    duration: n(s.durationMs),
+    error: typeof s.attributes?.error === "string" ? clip(s.attributes.error, TRACE_TEXT_CHARS) : null,
+    input: s.input === undefined ? null : clip(asText(s.input), TRACE_TEXT_CHARS),
+    output: s.output === undefined ? null : clip(asText(s.output), TRACE_TEXT_CHARS),
+    children: reportTrace(s.children ?? []),
+  }));
+}
+
 /** One self-contained HTML file: no network access, no external assets. Opens from file://. */
 export function renderHtmlReport(opts: HtmlReportOptions): string {
   const max = opts.maxTextChars ?? 20_000;
@@ -73,6 +102,7 @@ export function renderHtmlReport(opts: HtmlReportOptions): string {
           costUsd: s.costUsd ?? null,
           note: scoreNote(s) || null,
         })),
+        trace: a.trace && a.trace.length > 0 ? reportTrace(a.trace) : null,
       })),
     })),
     comparison: opts.comparison ?? null,

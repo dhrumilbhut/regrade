@@ -33,6 +33,8 @@ export interface RunCommandOptions {
   judge?: string;
   /** commander's `--no-judge-check` sets this to false. */
   judgeCheck?: boolean;
+  /** commander's `--no-trace` sets this to false. */
+  trace?: boolean;
   prices?: string;
   /** commander's `--no-color` sets this to false. */
   color?: boolean;
@@ -101,6 +103,7 @@ export async function runCommand(suitePath: string, o: RunCommandOptions): Promi
         label: o.label,
         judge: o.judge,
         judgeCheck: o.judgeCheck,
+        storeTraces: o.trace,
         prices,
         minPassRate: o.minPassRate,
       },

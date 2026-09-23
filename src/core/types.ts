@@ -36,8 +36,8 @@ export interface Usage {
 }
 
 /**
- * Intermediate step of a pipeline run. Reserved in Phase 1: adapters may return
- * it and it is validated, but it is not persisted until Phase 2.
+ * One step of a pipeline run (an LLM call, a tool call, a retrieval...), as reported by the pipeline.
+ * Stored with the attempt (long text clipped, secret-looking keys masked) and passed to scorers.
  */
 export interface TraceStep {
   kind: "llm" | "tool" | "retrieval" | "agent" | "other";
@@ -105,7 +105,7 @@ export interface ScoreArgs {
     costUsd: number | null;
     usage?: Usage;
   };
-  /** Populated from Phase 2. */
+  /** The steps the pipeline reported for this attempt, if any (`steps` in its response). */
   trace?: TraceStep[];
   runtime: ScoreRuntime;
 }
@@ -229,6 +229,8 @@ export interface AttemptRecord {
   error?: string;
   completedAt: string;
   scores: ScoreRecord[];
+  /** The pipeline's steps as stored (see `prepareTrace`). */
+  trace?: TraceStep[];
 }
 
 export interface RunSummary {

@@ -33,6 +33,9 @@ const ANSWERS: Record<string, string> = {
  *   SLOW:<ms>       answers "Paris" after <ms>
  *   COST            answers "ok" and self-reports usage, costUsd and steps
  *   ECHO:<text>     answers <text>
+ *   AGENT           an order-status agent: answers and reports a nested trace (search, then the
+ *                   lookup_order tool with {"orderId": 123}); in degraded mode it never calls the
+ *                   tool and loops on search six times
  * Any URL with ?mode=degraded answers every ordinary question with "I don't know." (a pipeline that got worse).
  * Anything else: a small Q&A table, else "I don't know."
  */
@@ -99,6 +102,21 @@ export async function startMockPipeline(): Promise<MockPipeline> {
         });
       }
       if (text.startsWith("ECHO:")) return json(200, { output: text.slice(5) });
+      if (text === "AGENT") {
+        const degraded = reqUrl.searchParams.get("mode") === "degraded";
+        const search = (i: number) => ({ kind: "retrieval", name: "search", startOffsetMs: 1 + i * 10, durationMs: 9, input: { query: "order 123" }, output: ["doc-7"] });
+        const children = degraded
+          ? Array.from({ length: 6 }, (_, i) => search(i))
+          : [
+              search(0),
+              { kind: "tool", name: "lookup_order", startOffsetMs: 11, durationMs: 25, input: { orderId: 123, fields: ["status"] }, output: { status: "shipped" }, attributes: { api_key: "sk-live-should-not-be-stored" } },
+              { kind: "llm", name: "answer", startOffsetMs: 37, durationMs: 40, input: "Summarise the order status.", output: "Your order shipped on Monday." },
+            ];
+        return json(200, {
+          output: degraded ? "I don't know." : "Your order shipped on Monday.",
+          steps: [{ kind: "agent", name: "order-agent", startOffsetMs: 0, durationMs: degraded ? 61 : 78, children }],
+        });
+      }
 
       if (reqUrl.searchParams.get("mode") === "degraded") return json(200, { output: "I don't know." });
 

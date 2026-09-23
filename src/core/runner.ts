@@ -8,6 +8,7 @@ import { resolveEnv, type Env } from "./env.js";
 import { AdapterError, ConfigError, errorMessage } from "./errors.js";
 import type { GitInfo } from "./git.js";
 import { stableHash } from "./hash.js";
+import { prepareTrace } from "./trace.js";
 import { runPool } from "./pool.js";
 import { redactConfig } from "./redact.js";
 import type { Registry } from "./registry.js";
@@ -42,6 +43,8 @@ export interface RunOverrides {
   judge?: string;
   /** Default true: before any case runs, make one tiny call to each judge to check it works. */
   judgeCheck?: boolean;
+  /** Default true: store the steps pipelines report. False keeps the database small (scorers still see them). */
+  storeTraces?: boolean;
   prices?: PriceEntryInput[];
   /**
    * Gate on the attempt-level pass rate (0..1) instead of requiring every case to pass.
@@ -303,6 +306,7 @@ export async function runSuite(opts: RunOptions): Promise<RunOutcome> {
       error,
       completedAt: now().toISOString(),
       scores,
+      trace: overrides.storeTraces === false ? undefined : prepareTrace(result?.steps),
     };
   };
 

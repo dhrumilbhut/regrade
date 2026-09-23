@@ -153,6 +153,21 @@ pre {
   white-space: pre-wrap; overflow-wrap: anywhere; max-height: 280px; overflow: auto;
 }
 .attempt { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--grid); }
+details.trace { margin-top: 12px; }
+details.trace > summary { cursor: pointer; font-size: 12px; font-weight: 600; color: var(--ink2); text-transform: uppercase; letter-spacing: 0.04em; }
+.steps { margin-top: 8px; display: grid; gap: 2px; }
+.srow > summary { list-style: none; cursor: pointer; }
+.srow > summary::-webkit-details-marker { display: none; }
+.srow[open] { padding-bottom: 8px; }
+.step { display: grid; grid-template-columns: 72px minmax(0, 1fr) minmax(60px, 32%) 64px; gap: 10px; align-items: center; padding: 3px 4px; border-radius: 4px; font-size: 13px; }
+.srow > summary:hover .step, .srow[open] .step { background: var(--wash); }
+.step .kind { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.step .sname { overflow-wrap: anywhere; }
+.step.serr .sname { color: var(--critical); }
+.step .bar { position: relative; height: 8px; border-radius: 4px; background: var(--wash); }
+.step .fill { position: absolute; top: 0; bottom: 0; min-width: 2px; border-radius: 4px; background: var(--accent); }
+.step.serr .fill { background: var(--critical); }
+.step .cnum { text-align: right; }
 .ahead { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-bottom: 8px; }
 .ahead .cnum { margin-left: 0; }
 .err { margin: 6px 0; font-size: 14px; }
@@ -165,6 +180,8 @@ ul.scores .sm { color: var(--muted); font-size: 12px; margin-top: 2px; }
 footer { color: var(--ink2); font-size: 12px; margin-top: 32px; }
 
 @media (max-width: 640px) {
+  .step { grid-template-columns: 60px minmax(0, 1fr) 56px; }
+  .step .bar { display: none; }
   .wrap { padding: 16px 12px 48px; }
   dl.facts { grid-template-columns: 1fr; gap: 0; }
   dl.facts dt { margin-top: 8px; font-size: 12px; }
@@ -403,7 +420,42 @@ export const JS = String.raw`
       });
       block.appendChild(list);
     }
+    if (a.trace && a.trace.length) block.appendChild(traceBlock(a.trace));
     return block;
+  }
+  function flatSteps(steps, depth, out) {
+    steps.forEach(function (s) { out.push({ s: s, depth: depth }); flatSteps(s.children || [], depth + 1, out); });
+    return out;
+  }
+  function traceBlock(steps) {
+    var rows = flatSteps(steps, 0, []);
+    var end = 0;
+    rows.forEach(function (r) { if (r.s.start !== null && r.s.duration !== null) end = Math.max(end, r.s.start + r.s.duration); });
+    var list = h('div', { class: 'steps' });
+    rows.forEach(function (r) {
+      var s = r.s;
+      var bar = h('div', { class: 'bar' });
+      if (end > 0 && s.start !== null && s.duration !== null) {
+        var fill = h('span', { class: 'fill' });
+        fill.style.left = (s.start / end * 100) + '%';
+        fill.style.width = Math.max(0.5, s.duration / end * 100) + '%';
+        bar.appendChild(fill);
+      }
+      var name = h('span', { class: 'sname', text: s.name });
+      name.style.paddingLeft = (r.depth * 14) + 'px';
+      var line = h('div', { class: 'step' + (s.error ? ' serr' : '') },
+        h('span', { class: 'kind', text: s.kind }), name, bar,
+        h('span', { class: 'cnum', text: s.duration === null ? '' : ms(s.duration) }));
+      if (s.error || s.input !== null || s.output !== null) {
+        list.appendChild(h('details', { class: 'srow' }, h('summary', null, line),
+          s.error ? h('p', { class: 'err', text: 'Error: ' + s.error }) : null,
+          s.input !== null ? kv('Step input', s.input) : null,
+          s.output !== null ? kv('Step output', s.output) : null));
+      } else {
+        list.appendChild(h('div', { class: 'srow' }, line));
+      }
+    });
+    return h('details', { class: 'trace' }, h('summary', { text: 'Trace · ' + rows.length + (rows.length === 1 ? ' step' : ' steps') }), list);
   }
   function caseItem(c, open) {
     var passed = c.attempts.filter(function (a) { return a.status === 'passed'; }).length;

@@ -19,7 +19,7 @@ export const DEFAULT_REPORT_PATH = "regrade-report.html";
 export function reportCommand(runRef: string, o: ReportOptions): string {
   const source = new RunSource(o.db);
   try {
-    const head = source.load(runRef);
+    const head = source.load(runRef, { traces: true });
     if (head.file?.compact) {
       throw new ConfigError(`${runRef} is a compact run file (no inputs or outputs); a report needs a full run. Use it with --against.`);
     }

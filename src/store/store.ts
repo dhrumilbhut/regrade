@@ -15,6 +15,7 @@ export interface Store {
   /** Accepts a full run id or a unique prefix. Throws `ConfigError` if ambiguous. */
   getRun(idOrPrefix: string): RunRecord | undefined;
   listRuns(opts?: { suiteName?: string; limit?: number }): RunRecord[];
-  getAttempts(runId: string): AttemptRecord[];
+  /** Attempts in insertion order. Traces are loaded only when asked for (`traces: true`). */
+  getAttempts(runId: string, opts?: { traces?: boolean }): AttemptRecord[];
   close(): void;
 }

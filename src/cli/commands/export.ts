@@ -16,7 +16,7 @@ export interface ExportOptions {
 export function exportCommand(runRef: string, o: ExportOptions): void {
   const store = openExistingStore(o.db);
   try {
-    const { run, attempts } = loadRun(store, runRef);
+    const { run, attempts } = loadRun(store, runRef, { traces: true });
     const file = buildRunFile(run, attempts, { regradeVersion: VERSION, compact: o.compact });
     if (!o.out) {
       process.stdout.write(serializeRunFile(file));

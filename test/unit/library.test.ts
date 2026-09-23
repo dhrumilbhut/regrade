@@ -55,7 +55,7 @@ describe("library usage (mirrors the README example)", () => {
 
   it("exposes the built-ins on defaultRegistry so registerScorer/registerAdapter work without setup", () => {
     expect(defaultRegistry.adapterNames()).toEqual(["anthropic", "http", "openai"]);
-    expect(defaultRegistry.scorerNames()).toEqual(["exactMatch", "latencyCost", "llmJudge"]);
+    expect(defaultRegistry.scorerNames()).toEqual(["exactMatch", "latencyCost", "llmJudge", "maxSteps", "toolCalled"]);
   });
 
   it("createRegistry returns isolated registries", () => {

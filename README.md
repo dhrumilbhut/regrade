@@ -13,7 +13,7 @@ Regrade runs a suite of test cases through your real pipeline, scores every outp
 - **Honest scoring.** Exact match, an LLM judge hardened against prompt injection, and latency/cost thresholds. Cost accounting prices cache tokens and says "unknown" rather than guessing.
 - **Zero infrastructure.** One CLI, results in one SQLite file, suites are plain JSON you can commit.
 
-> **Status: v0.3.1.** Run, score, persist and repeat; `compare`, `runs`, `show` and single-file HTML/Markdown reports; and **code suites** (TypeScript or JavaScript, with inline scorers and in-process pipelines). Next: trace capture, RAG scorers, judge calibration and a local dashboard.
+> **Status: v0.4.0.** Run, score, persist and repeat; `compare`, `runs`, `show` and single-file HTML/Markdown reports; **code suites** (TypeScript or JavaScript, with inline scorers and in-process pipelines); **baselines for CI** (run files); and **traces** (stored, shown and scored). Next: RAG scorers, judge calibration and a local dashboard.
 
 ## Install
 
@@ -119,7 +119,7 @@ Regrade POSTs `{ "input": <case input> }` and expects `{ "output": "<string>" }`
 
 Options: `url`, `method` (POST/PUT/PATCH), `headers`, `outputField` (default `output`), `retries`, `retryBaseDelayMs`.
 
-The pipeline can also report `costUsd`, `usage`, `steps` (a trace) and `metadata` in its response. Cost and usage are used; `steps` is accepted and validated now and stored once trace capture ships (Phase 2). A Python (FastAPI/Flask), Node, or Go service needs only this one endpoint.
+The pipeline can also report `costUsd`, `usage`, `steps` (a trace) and `metadata` in its response. Cost and usage are used, and `steps` are stored and can be scored (see [Traces](#traces-check-what-the-agent-did-not-just-what-it-said)). A Python (FastAPI/Flask), Node, or Go service needs only this one endpoint.
 
 ### OpenAI (and anything OpenAI-compatible)
 
@@ -146,6 +146,8 @@ Both LLM adapters accept `apiKeyEnv` (to name a different env var), `inputTempla
 | `exactMatch` | Deterministic equality with `expected`. By default trimmed, whitespace-normalised and case-insensitive. Options: `caseSensitive`, `trim`, `normalizeWhitespace`. |
 | `llmJudge` | Asks an LLM to judge the output against a rubric (`scorerConfig.llmJudge.rubric`, default: "does the output correctly and completely address the input, matching the intent of the expected answer?"). Model: `provider:model` from `scorerConfig.llmJudge.judge`, `--judge`, `defaults.judge`, or `REGRADE_JUDGE`. |
 | `latencyCost` | Records latency and **fails** if `maxLatencyMs` or `maxCostUsd` is exceeded. With no thresholds it always passes. If `maxCostUsd` is set but the cost is unknown it reports an error, not a silent pass. |
+| `toolCalled` | Checks the pipeline's [trace](#traces-check-what-the-agent-did-not-just-what-it-said): was a tool called (with these arguments, this many times), or not called. |
+| `maxSteps` | Checks the trace: did the attempt finish within a step budget (optionally of one kind)? |
 
 ### About the LLM judge
 
@@ -206,6 +208,62 @@ export default {
 - **Timeouts are enforced for you.** Every attempt and every scorer is bounded by `--timeout` (default 30 s), even if your code ignores the `AbortSignal` it is given; a hung function becomes an *errored* attempt, not a hung run.
 - **Editing a scorer is a change, not a regression.** Each inline scorer is fingerprinted from its source, and the fingerprint is part of its cases' identity, so after you edit one, `regrade compare` reports those cases as `modified` instead of comparing results produced by different logic. (Changes in code the scorer *imports* are not detected: bump `fingerprint` if you keep logic in a helper.)
 - **Suite files run code.** Loading a code suite executes it, exactly like a test file: only run suites you trust. JSON suites are pure data.
+
+## Traces: check what the agent did, not just what it said
+
+An agent can give the right answer for the wrong reason, or the same answer after twice as many steps. If your pipeline reports its **steps** (LLM calls, tool calls, retrievals), Regrade stores them with each attempt, shows them, and can score them.
+
+**From an HTTP pipeline**, add `steps` to the response:
+
+```json
+{
+  "output": "Your order shipped on Monday.",
+  "steps": [
+    { "kind": "agent", "name": "order-agent", "startOffsetMs": 0, "durationMs": 78, "children": [
+      { "kind": "retrieval", "name": "search", "durationMs": 9, "input": { "query": "order 123" } },
+      { "kind": "tool", "name": "lookup_order", "durationMs": 25, "input": { "orderId": 123 }, "output": { "status": "shipped" } },
+      { "kind": "llm", "name": "answer", "durationMs": 40 }
+    ] }
+  ]
+}
+```
+
+`kind` is one of `llm`, `tool`, `retrieval`, `agent`, `other`; everything except `kind` and `name` is optional.
+
+**From a function pipeline**, record steps with `tracer()`. Steps started inside another step become its children, and errors are recorded on the step:
+
+```ts
+import { tracer } from "regrade";   // a value import: npm i -D regrade
+
+async function run(question: string) {
+  const t = tracer();
+  const docs = await t.step("retrieval", "search", () => search(question), { input: { query: question } });
+  const order = await t.step("tool", "lookup_order", () => lookupOrder(123), { input: { orderId: 123 } });
+  const text = await t.step("llm", "answer", () => answer(question, docs, order));
+  return { output: text, steps: t.steps };
+}
+```
+
+**Score the trace** with two built-in scorers (a case using them errors, never passes, when the pipeline reported no trace):
+
+| Scorer | Config | Passes when |
+|---|---|---|
+| `toolCalled` | `tool`; optional `argsInclude` (the call's `input` contains these values; objects match partially), `times` (exact count), `not` | the tool was called (with those arguments, that many times), or with `not: true`, was not |
+| `maxSteps` | `max`; optional `kind` | the attempt took at most `max` steps (of that kind): catches loops and runaway retries |
+
+```json
+"scorers": ["llmJudge", "toolCalled", "maxSteps"],
+"scorerConfig": {
+  "toolCalled": { "tool": "lookup_order", "argsInclude": { "orderId": 123 } },
+  "maxSteps": { "max": 5, "kind": "retrieval" }
+}
+```
+
+Your own scorers receive the full trace as `trace` in their arguments.
+
+**See it:** `regrade show <run> <case>` prints the step tree with durations (`--full` adds each step's input and output), and the HTML report has a collapsible trace with timing bars under each attempt. Run files include traces, except compact ones.
+
+**What is stored.** Values under secret-looking keys (`authorization`, `api_key`, `token`, `password`...) are masked, step inputs and outputs longer than 20,000 characters are clipped, and at most 1,000 steps are kept per attempt; anything cut is marked. Traces live in their own table, so reads that don't need them (such as `compare`) stay fast. `regrade run --no-trace` stores none; scorers still see them.
 
 ## Non-determinism: repeat your cases
 
@@ -412,6 +470,7 @@ regrade run <suite> [options]     Run a suite (.json, or a code suite: .ts .mts 
   --label <text>                  label the run (e.g. a prompt version)
   --judge <provider:model>        LLM judge model
   --no-judge-check                skip the one tiny call that checks the judge before any case runs
+  --no-trace                      do not store the steps pipelines report
   --prices <file>                 extra/override model prices
   --no-color                      plain output (also honours NO_COLOR; set REGRADE_ASCII=1 for ASCII symbols)
 regrade runs [--suite <name>] [--limit <n>]        List saved runs, newest first
@@ -452,7 +511,7 @@ process.exitCode = outcome.exitCode;
 ## Security & privacy
 
 - Suite files are safe to commit: secrets are referenced as `${ENV_VAR}`. Resolved values are never written to the database; hard-coded secrets are masked before storing (with a warning).
-- The database contains your raw inputs and outputs, which may be sensitive. `regrade init` git-ignores `.regrade/`.
+- The database contains your raw inputs and outputs (and pipeline traces), which may be sensitive. `regrade init` git-ignores `.regrade/`. Values under secret-looking keys in traces are masked before storing; `--no-trace` stores none. Compact run files contain no inputs, outputs or traces.
 - Regrade contacts only the URLs and providers you configure. There is no telemetry and no update check.
 - See [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
 

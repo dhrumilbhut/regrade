@@ -1,5 +1,6 @@
 import { ConfigError } from "../../core/errors.js";
-import type { AttemptRecord, RunRecord } from "../../core/types.js";
+import { flattenTrace } from "../../core/trace.js";
+import type { AttemptRecord, RunRecord, TraceStep } from "../../core/types.js";
 import { groupCases } from "../../core/verdict.js";
 import { formatCost, formatMs } from "../../report/console.js";
 import { fmtDate, scoreNote } from "../../report/format.js";
@@ -22,6 +23,30 @@ function block(text: string, full: boolean, indent = "      "): string {
 }
 
 const inputText = (i: AttemptRecord["input"]): string => (typeof i === "string" ? i : JSON.stringify(i, null, 2));
+
+/** The step tree: kind, name, duration, and any error; with --full also each step's input and output. */
+function renderTrace(steps: TraceStep[], full: boolean, c: ReturnType<typeof colorFor>): string[] {
+  const all = flattenTrace(steps);
+  const out = [`    trace  ${c.dim(`${all.length} step${all.length === 1 ? "" : "s"}`)}`];
+  const nameWidth = Math.min(40, Math.max(...all.map((s) => s.name.length)));
+  const visit = (list: TraceStep[], depth: number) => {
+    for (const s of list) {
+      const pad = "  ".repeat(depth);
+      const error = typeof s.attributes?.error === "string" ? `  ${c.yellow(`error: ${s.attributes.error}`)}` : "";
+      const time = s.durationMs === undefined ? "" : formatMs(s.durationMs);
+      out.push(`      ${pad}${c.dim(s.kind.padEnd(9))} ${s.name.padEnd(Math.max(0, nameWidth - pad.length))}  ${c.dim(time.padStart(8))}${error}`);
+      if (full) {
+        const indent = `        ${pad}`;
+        if (s.input !== undefined) out.push(`${indent}${c.dim("input")}`, block(inputText(s.input as AttemptRecord["input"]), true, `${indent}  `));
+        if (s.output !== undefined) out.push(`${indent}${c.dim("output")}`, block(inputText(s.output as AttemptRecord["input"]), true, `${indent}  `));
+      }
+      if (s.children) visit(s.children, depth + 1);
+    }
+  };
+  visit(steps, 0);
+  if (!full && all.some((s) => s.input !== undefined || s.output !== undefined)) out.push(c.dim("      (step inputs and outputs: --full)"));
+  return out;
+}
 
 export function renderRunSummary(run: RunRecord, attempts: AttemptRecord[], color?: boolean): string {
   const c = colorFor(color);
@@ -77,6 +102,7 @@ export function renderCaseDetail(run: RunRecord, attempts: AttemptRecord[], case
       out.push("    output");
       out.push(block(a.output, full, "      "));
     }
+    if (a.trace && a.trace.length > 0) out.push(...renderTrace(a.trace, full, c));
     for (const s of a.scores) {
       const m = s.error ? c.yellow("!") : s.pass ? c.green("✓") : c.red("✗");
       const detail = s.error ? `error: ${s.error}` : (s.reasoning ?? "");
@@ -91,7 +117,7 @@ export function renderCaseDetail(run: RunRecord, attempts: AttemptRecord[], case
 export function showCommand(runRef: string, caseId: string | undefined, o: ShowOptions): void {
   const store = openExistingStore(o.db);
   try {
-    const { run, attempts } = loadRun(store, runRef);
+    const { run, attempts } = loadRun(store, runRef, { traces: caseId !== undefined });
     const color = o.color === false ? false : undefined; // commander defaults a negatable --no-color option to true
     process.stdout.write(caseId ? renderCaseDetail(run, attempts, caseId, o.full, color) : renderRunSummary(run, attempts, color));
   } finally {

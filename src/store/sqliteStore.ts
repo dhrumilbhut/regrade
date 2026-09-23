@@ -9,6 +9,7 @@ import type {
   RunStatus,
   RunSummary,
   ScoreRecord,
+  TraceStep,
   Usage,
 } from "../core/types.js";
 import { LATEST_SCHEMA_VERSION, migrations } from "./migrations.js";
@@ -85,15 +86,19 @@ export class SqliteStore implements Store {
     const insertResult = this.db.prepare(
       `INSERT INTO results (run_id, case_id, attempt, case_hash, input_json, expected, tags_json, output,
                             latency_ms, cost_usd, input_tokens, output_tokens, cached_input_tokens,
+                            cache_write_tokens, cache_write_1h_tokens, reasoning_tokens,
                             status, error, completed_at)
        VALUES (@runId, @caseId, @attempt, @caseHash, @input, @expected, @tags, @output,
                @latencyMs, @costUsd, @inputTokens, @outputTokens, @cachedInputTokens,
+               @cacheWriteTokens, @cacheWrite1hTokens, @reasoningTokens,
                @status, @error, @completedAt)`,
     );
     const insertScore = this.db.prepare(
       `INSERT INTO scores (result_id, scorer_name, pass, value, reasoning, cost_usd, error, config_json, metadata_json)
        VALUES (@resultId, @scorerName, @pass, @value, @reasoning, @costUsd, @error, @config, @metadata)`,
     );
+
+    const insertTrace = this.db.prepare(`INSERT INTO traces (result_id, trace_json) VALUES (?, ?)`);
 
     this.db.transaction(() => {
       const info = insertResult.run({
@@ -110,11 +115,15 @@ export class SqliteStore implements Store {
         inputTokens: a.usage?.inputTokens ?? null,
         outputTokens: a.usage?.outputTokens ?? null,
         cachedInputTokens: a.usage?.cachedInputTokens ?? null,
+        cacheWriteTokens: a.usage?.cacheWriteTokens ?? null,
+        cacheWrite1hTokens: a.usage?.cacheWrite1hTokens ?? null,
+        reasoningTokens: a.usage?.reasoningTokens ?? null,
         status: a.status,
         error: a.error ?? null,
         completedAt: a.completedAt,
       });
       const resultId = Number(info.lastInsertRowid);
+      if (a.trace) insertTrace.run(resultId, JSON.stringify(a.trace));
       for (const s of a.scores) {
         insertScore.run({
           resultId,
@@ -168,17 +177,27 @@ export class SqliteStore implements Store {
     return rows.map(mapRun);
   }
 
-  getAttempts(runId: string): AttemptRecord[] {
+  getAttempts(runId: string, opts: { traces?: boolean } = {}): AttemptRecord[] {
     const results = this.db
       .prepare(`SELECT * FROM results WHERE run_id = ? ORDER BY result_id`)
       .all(runId) as Row[];
     const scoreStmt = this.db.prepare(`SELECT * FROM scores WHERE result_id = ? ORDER BY score_id`);
+    const traces = new Map<unknown, string>();
+    if (opts.traces) {
+      const rows = this.db
+        .prepare(`SELECT t.result_id, t.trace_json FROM traces t JOIN results r USING (result_id) WHERE r.run_id = ?`)
+        .all(runId) as Row[];
+      for (const t of rows) traces.set(t.result_id, String(t.trace_json));
+    }
     return results.map((r) => {
       const scores = (scoreStmt.all(r.result_id) as Row[]).map(mapScore);
       const usage: Usage = {};
       if (typeof r.input_tokens === "number") usage.inputTokens = r.input_tokens;
       if (typeof r.output_tokens === "number") usage.outputTokens = r.output_tokens;
       if (typeof r.cached_input_tokens === "number") usage.cachedInputTokens = r.cached_input_tokens;
+      if (typeof r.cache_write_tokens === "number") usage.cacheWriteTokens = r.cache_write_tokens;
+      if (typeof r.cache_write_1h_tokens === "number") usage.cacheWrite1hTokens = r.cache_write_1h_tokens;
+      if (typeof r.reasoning_tokens === "number") usage.reasoningTokens = r.reasoning_tokens;
       const attempt: AttemptRecord = {
         caseId: String(r.case_id),
         attempt: Number(r.attempt),
@@ -195,6 +214,8 @@ export class SqliteStore implements Store {
         completedAt: String(r.completed_at),
         scores,
       };
+      const trace = traces.get(r.result_id);
+      if (trace !== undefined) attempt.trace = JSON.parse(trace) as TraceStep[];
       return attempt;
     });
   }

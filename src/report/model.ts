@@ -23,6 +23,7 @@ export interface RunReport {
       output: string | null;
       error?: string;
       scores: AttemptRecord["scores"];
+      trace?: AttemptRecord["trace"];
     }>;
   }>;
 }
@@ -47,6 +48,7 @@ export function buildRunReport(run: RunRecord, attempts: readonly AttemptRecord[
         output: a.output,
         error: a.error,
         scores: a.scores,
+        trace: a.trace,
       })),
     })),
   };
