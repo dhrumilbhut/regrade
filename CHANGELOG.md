@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0]: baselines and traces
+
+Regrade in CI without a shared database, and a look inside what the agent did.
+
 ### Added
 - **Baselines for CI: run files.** `regrade export <run>` and `regrade run --export <file>` write a portable, versioned run file that keeps every attempt's case hash. `--compact` keeps only what a comparison needs (no inputs, outputs, error text or judge reasoning), so a baseline is small and safe to commit. `compare` and `report --against` accept run files wherever they take a run id (`regrade compare base.json head.json` needs no database; a file alone is the baseline for the latest run of its suite), and `regrade import` loads a full run file into a database. The README has two GitHub Actions recipes: a committed baseline, and the latest run on main.
 - **Traces.** The `steps` a pipeline reports (HTTP response, or a function pipeline's return value) are now stored with each attempt: values under secret-looking keys masked, step inputs/outputs over 20,000 characters clipped, at most 1,000 steps per attempt (anything cut is marked). `regrade show <run> <case>` prints the step tree (`--full` adds step inputs and outputs), the HTML report has a collapsible trace with timing bars, and full run files and the JSON report include traces. `--no-trace` stores none.
